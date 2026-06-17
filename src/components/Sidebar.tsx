@@ -8,6 +8,7 @@ import {
   Car,
   Settings,
 } from "lucide-react";
+import { FileText } from "lucide-react";
 
 export default function Sidebar() {
   return (
@@ -38,6 +39,13 @@ export default function Sidebar() {
         >
           <Receipt size={20} />
           Billing
+        </Link>
+        <Link
+          href="/invoices"
+          className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800"
+        >
+          <FileText size={20} />
+          Invoices
         </Link>
 
         <Link
