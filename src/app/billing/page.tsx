@@ -2,15 +2,34 @@
 import { customers } from "@/data/customers";
 import { useState } from "react";
 import { products } from "@/data/products";
+import Link from "next/link";
 export default function BillingPage() {
   const [cart, setCart] = useState<any[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("Cash");
+  const [paymentStatus, setPaymentStatus] =
+    useState("Paid");
   const [invoiceNumber, setInvoiceNumber] =
     useState("");
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [vehicleNumber, setVehicleNumber] = useState("");
+  const [vehicleModel, setVehicleModel] = useState("");
 
   const [invoiceGenerated, setInvoiceGenerated] =
     useState(false);
+  const [discount, setDiscount] = useState(0);
+  const subtotal = cart.reduce(
+    (sum, item) =>
+      sum + item.sellPrice * item.quantity,
+    0
+  );
+  
+
+  const total =
+    subtotal - (subtotal * discount) / 100;
+  const [orderNote, setOrderNote] =
+    useState("");
   return (
     <div>
       <h1 className="text-3xl font-bold mb-6">
@@ -41,6 +60,15 @@ export default function BillingPage() {
 
                   <p className="text-gray-500">
                     ₹{product.sellPrice}
+                  </p>
+
+                  <p
+                    className={`text-xs mt-1 ${product.stock <= 10
+                      ? "text-red-500 font-medium"
+                      : "text-gray-500"
+                      }`}
+                  >
+                    Stock Left: {product.stock}
                   </p>
                 </div>
 
@@ -92,6 +120,43 @@ export default function BillingPage() {
               {invoiceNumber}
             </p>
           </div>
+          <div className="mb-4 border rounded-lg p-4">
+            <h3 className="font-semibold mb-3">
+              Customer Details
+            </h3>
+
+            <input
+              type="text"
+              placeholder="Customer Name"
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+              className="w-full border rounded-lg p-3 mb-3"
+            />
+
+            <input
+              type="text"
+              placeholder="Mobile Number"
+              value={customerPhone}
+              onChange={(e) => setCustomerPhone(e.target.value)}
+              className="w-full border rounded-lg p-3 mb-3"
+            />
+
+            <input
+              type="text"
+              placeholder="Vehicle Number (Optional)"
+              value={vehicleNumber}
+              onChange={(e) => setVehicleNumber(e.target.value)}
+              className="w-full border rounded-lg p-3 mb-3"
+            />
+
+            <input
+              type="text"
+              placeholder="Vehicle Model (Optional)"
+              value={vehicleModel}
+              onChange={(e) => setVehicleModel(e.target.value)}
+              className="w-full border rounded-lg p-3"
+            />
+          </div>
           <div className="mb-4">
 
             <label className="block text-sm font-medium mb-2">
@@ -135,6 +200,38 @@ export default function BillingPage() {
               <option>Credit</option>
             </select>
 
+          </div>
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-2">
+              Payment Status
+            </label>
+
+            <select
+              value={paymentStatus}
+              onChange={(e) =>
+                setPaymentStatus(e.target.value)
+              }
+              className="w-full border rounded-lg p-3"
+            >
+              <option>Paid</option>
+              <option>Partial</option>
+              <option>Debt</option>
+            </select>
+          </div>
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-2">
+              Order Notes
+            </label>
+
+            <textarea
+              value={orderNote}
+              onChange={(e) =>
+                setOrderNote(e.target.value)
+              }
+              placeholder="Enter any special customer request..."
+              rows={3}
+              className="w-full border rounded-lg p-3"
+            />
           </div>
 
           {cart.length === 0 ? (
@@ -213,15 +310,23 @@ export default function BillingPage() {
                 </div>
 
                 <div className="flex justify-between">
-                  <span>Total</span>
-                  <span>
-                    ₹{cart.reduce(
-                      (sum, item) =>
-                        sum + item.sellPrice * item.quantity,
-                      0
-                    )}
-                  </span>
+                  <span>Subtotal</span>
+                  <span>₹{subtotal}</span>
                 </div>
+              </div>
+              <div className="flex justify-between items-center mt-4">
+                <span>Discount %</span>
+
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={discount}
+                  onChange={(e) =>
+                    setDiscount(Number(e.target.value))
+                  }
+                  className="w-20 border rounded p-1 text-center"
+                />
               </div>
               <div className="border-t mt-4 pt-4">
                 <p className="text-lg font-bold">
@@ -244,9 +349,16 @@ export default function BillingPage() {
                   </button>
                 )}
 
+                <Link
+                  href="/invoices"
+                  className="block text-center mt-3 bg-slate-900 text-white py-3 rounded-lg font-semibold"
+                >
+                  Recent Bills
+                </Link>
+
               </div>
               {invoiceGenerated && (
-                
+
                 <div className="mt-6 border-t pt-4">
 
                   <h3 className="text-lg font-bold">
@@ -259,7 +371,30 @@ export default function BillingPage() {
 
                   <p className="text-gray-500">
                     Customer: {selectedCustomer || "Walk-in Customer"}
+                    {customerPhone && (
+                      <p className="text-gray-500">
+                        Mobile: {customerPhone}
+                      </p>
+                    )}
+
+                    {vehicleNumber && (
+                      <p className="text-gray-500">
+                        Vehicle No: {vehicleNumber}
+                      </p>
+                    )}
+
+                    {vehicleModel && (
+                      <p className="text-gray-500">
+                        Vehicle Model: {vehicleModel}
+                      </p>
+                    )}
                   </p>
+                  {orderNote && (
+                    <p className="text-gray-500">
+                      Note: {orderNote}
+                    </p>
+                  )}
+
                   <div className="mt-4 space-y-2">
 
                     {cart.map((item) => (
@@ -287,6 +422,22 @@ export default function BillingPage() {
                       0
                     )}
                   </p>
+                  <button
+                    onClick={() => {
+                      if (!customerPhone) {
+                        alert("Enter customer mobile number");
+                        return;
+                      }
+
+                      window.open(
+                        `https://wa.me/91${customerPhone}`,
+                        "_blank"
+                      );
+                    }}
+                    className="w-full mt-3 bg-green-500 hover:bg-green-600 text-white py-3 rounded-lg font-semibold"
+                  >
+                    Send via WhatsApp
+                  </button>
 
                 </div>
               )}

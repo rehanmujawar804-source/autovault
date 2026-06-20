@@ -1,6 +1,9 @@
 "use client";
 import StatCard from "@/components/StatCard";
+import Link from "next/link";
 import { useEffect, useState } from "react";
+import PaymentSplitChart from "@/components/PaymentSplitChart";
+import RevenueProfitChart from "@/components/RevenueProfitChart";
 export default function DashboardPage() {
   const [role, setRole] = useState("");
 
@@ -85,20 +88,46 @@ export default function DashboardPage() {
             </h2>
 
             <div className="h-60 border rounded-lg flex items-center justify-center text-gray-400">
-              Graph Coming Soon
+              <RevenueProfitChart />
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow p-5 h-80">
+          <div className="bg-white rounded-xl shadow p-5 min-h-[420px]">
             <h2 className="text-xl font-semibold mb-4">
               Payment Split
             </h2>
 
-            <div className="space-y-4">
-              <div>Cash - ₹18,000</div>
-              <div>UPI - ₹20,500</div>
-              <div>Card - ₹4,000</div>
-            </div>
+            <>
+              <PaymentSplitChart />
+
+              <div className="mt-4 space-y-3 text-sm">
+
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                    <span>Cash</span>
+                  </div>
+                  <span className="font-medium">₹18,000</span>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                    <span>UPI</span>
+                  </div>
+                  <span className="font-medium">₹20,500</span>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+                    <span>Card</span>
+                  </div>
+                  <span className="font-medium">₹4,000</span>
+                </div>
+
+              </div>
+            </>
           </div>
         </div>
       )}
@@ -190,31 +219,31 @@ export default function DashboardPage() {
       </div>
       {role === "owner" && (
 
-      <div className="bg-white rounded-xl shadow p-5 mb-6">
-        <h2 className="text-xl font-semibold mb-4">
-          📈 Business Insights
-        </h2>
+        <div className="bg-white rounded-xl shadow p-5 mb-6">
+          <h2 className="text-xl font-semibold mb-4">
+            📈 Business Insights
+          </h2>
 
-        <div className="space-y-3">
+          <div className="space-y-3">
 
-          <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-            Revenue is up 12% compared to yesterday.
+            <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+              Revenue is up 12% compared to yesterday.
+            </div>
+
+            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              Android Stereo is the top-selling product this week.
+            </div>
+
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+              12 products are running low on stock.
+            </div>
+
+            <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
+              Rahul Sharma has the highest outstanding debt.
+            </div>
+
           </div>
-
-          <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-            Android Stereo is the top-selling product this week.
-          </div>
-
-          <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-            12 products are running low on stock.
-          </div>
-
-          <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
-            Rahul Sharma has the highest outstanding debt.
-          </div>
-
         </div>
-      </div>
       )}
 
       {/* Quick Actions + Recent Transactions */}
@@ -225,21 +254,32 @@ export default function DashboardPage() {
           </h2>
 
           <div className="grid grid-cols-2 gap-3">
-            <button className="bg-slate-900 text-white rounded-lg p-3">
+            <Link
+              href="/inventory"
+              className="bg-slate-900 text-white rounded-lg p-3 text-center"
+            >
               Add Product
-            </button>
-
-            <button className="bg-slate-900 text-white rounded-lg p-3">
+            </Link>
+            <Link
+              href="/inventory"
+              className="bg-slate-900 text-white rounded-lg p-3 text-center"
+            >
               New Bill
-            </button>
+            </Link>
 
-            <button className="bg-slate-900 text-white rounded-lg p-3">
+            <Link
+              href="/inventory"
+              className="bg-slate-900 text-white rounded-lg p-3 text-center"
+            >
               Add Customer
-            </button>
+            </Link>
 
-            <button className="bg-slate-900 text-white rounded-lg p-3">
+            <Link
+              href="/inventory"
+              className="bg-slate-900 text-white rounded-lg p-3 text-center"
+            >
               Record Payment
-            </button>
+            </Link>
           </div>
         </div>
 
