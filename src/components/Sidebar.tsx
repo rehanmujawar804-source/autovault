@@ -1,4 +1,8 @@
+"use client";
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { LogOut } from "lucide-react";
+import { useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Package,
@@ -11,6 +15,16 @@ import {
 import { FileText } from "lucide-react";
 
 export default function Sidebar() {
+  const [role, setRole] = useState("");
+  const router = useRouter();
+
+  useEffect(() => {
+    const savedRole = localStorage.getItem("role");
+
+    if (savedRole) {
+      setRole(savedRole);
+    }
+  }, []);
   return (
     <aside className="w-64 bg-slate-950 text-white min-h-screen p-5 border-r border-slate-800">
       <h1 className="text-2xl font-bold mb-10 text-amber-400">        AutoVault
@@ -56,13 +70,15 @@ export default function Sidebar() {
           Customers
         </Link>
 
-        <Link
-          href="/analytics"
-          className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-800 transition-all duration-200"
-        >
-          <BarChart3 size={20} />
-          Analytics
-        </Link>
+        {role === "owner" && (
+          <Link
+            href="/analytics"
+            className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-800 transition-all duration-200"
+          >
+            <BarChart3 size={20} />
+            Analytics
+          </Link>
+        )}
 
         <Link
           href="/vehicle-fitment"
@@ -72,13 +88,25 @@ export default function Sidebar() {
           Vehicle Fitment
         </Link>
 
-        <Link
-          href="/settings"
-          className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-800 transition-all duration-200"
+        {role === "owner" && (
+          <Link
+            href="/settings"
+            className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-800 transition-all duration-200"
+          >
+            <Settings size={20} />
+            Settings
+          </Link>
+        )}
+        <button
+          onClick={() => {
+            localStorage.removeItem("role");
+            router.push("/login");
+          }}
+          className="flex items-center gap-3 p-3 rounded-xl hover:bg-red-900 text-red-400 transition-all duration-200 mt-4"
         >
-          <Settings size={20} />
-          Settings
-        </Link>
+          <LogOut size={20} />
+          Logout
+        </button>
       </nav>
     </aside>
   );
