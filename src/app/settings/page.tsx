@@ -1,3 +1,31 @@
+"use client";
+
+import { useState, useEffect, useMemo, useRef } from "react";
+import type { AppState } from "@/types";
+import { useRole } from "@/hooks/useRole";
+import { useStore, roundMoney } from "@/lib/store";
+import { useRouter } from "next/navigation";
+import {
+  Save,
+  Store,
+  User,
+  Phone,
+  MapPin,
+  FileText,
+  Shield,
+  RotateCcw,
+  LogOut,
+  Check,
+  Activity,
+  CheckCircle,
+  AlertCircle,
+  Download,
+  Upload,
+} from "lucide-react";
+
+const SETTINGS_KEY = "autovault_settings";
+
+type ShopSettings = {
   shopName: string;
   ownerName: string;
   phone: string;
@@ -36,7 +64,7 @@ export default function SettingsPage() {
   const { isOwner, loading, role, logout } = useRole();
   const { state, reconcileDebtCache, showToast, dispatch, exportStoreAsJSON } = useStore();
 
-  const [settings, setSettings] = useState<ShopSettings>(DEFAULTS);
+  const [settings, setSettings] = useState<ShopSettings>(() => loadSettings());
   const [saved, setSaved] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showImportConfirm, setShowImportConfirm] = useState(false);
@@ -62,15 +90,12 @@ export default function SettingsPage() {
     try {
       reconcileDebtCache();
       showToast("Customer debt cache reconciled and corrected!", "success");
-    } catch (err) {
+    } catch {
       showToast("Reconciliation failed.", "error");
     }
   }
 
-  // ── Load saved settings on mount ──────────────────────────────────────────
-  useEffect(() => {
-    setSettings(loadSettings());
-  }, []);
+  // Settings are loaded via useState lazy initializer above — no effect needed.
 
   // ── Owner-only guard ──────────────────────────────────────────────────────
   useEffect(() => {
