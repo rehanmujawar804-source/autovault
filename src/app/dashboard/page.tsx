@@ -197,7 +197,7 @@ export default function DashboardPage() {
   // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6 pb-12">
-      
+
       {/* ── Top Bar ───────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
         <div>
@@ -217,7 +217,7 @@ export default function DashboardPage() {
 
       {/* ── ZONE 1: Grouped Snapshot (Financials & Operations side-by-side) ── */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-stretch">
-        
+
         {/* Financial Metrics Summary (Owner only) */}
         {isOwner ? (
           <div className="xl:col-span-7 bg-slate-900 border border-slate-800 text-white rounded-2xl p-6 shadow-md flex flex-col justify-between relative overflow-hidden group">
@@ -303,7 +303,7 @@ export default function DashboardPage() {
               <h2 className="font-extrabold text-slate-900 text-sm uppercase tracking-wider">System Action Center</h2>
             </div>
             <span className="bg-red-550 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-              { (totalDebt > 0 ? 1 : 0) + (outOfStock.length > 0 ? 1 : 0) + (lowStock.length > 0 ? 1 : 0) } Concerns
+              {(totalDebt > 0 ? 1 : 0) + (outOfStock.length > 0 ? 1 : 0) + (lowStock.length > 0 ? 1 : 0)} Concerns
             </span>
           </div>
 
@@ -365,10 +365,10 @@ export default function DashboardPage() {
 
       {/* ── ZONE 3: 12-Column Layout Grid (Invoices & Trends vs Sidebar Controls) ── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-        
+
         {/* LEFT COLUMN: Activity Visualizer & Invoice log (8/12 grid span) */}
         <div className="lg:col-span-8 space-y-6 flex flex-col justify-between">
-          
+
           {/* Sales Trend SVG line chart */}
           <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm flex-1 flex flex-col justify-between">
             <div className="pb-3 border-b border-slate-50">
@@ -565,7 +565,7 @@ export default function DashboardPage() {
 
         {/* RIGHT COLUMN: Controls, breakdowns, leaderboards (4/12 grid span) */}
         <div className="lg:col-span-4 space-y-6">
-          
+
           {/* Top Products Card */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm">
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
@@ -655,7 +655,7 @@ export default function DashboardPage() {
               <h2 className="font-extrabold text-slate-900 text-sm md:text-base">Quick Operations</h2>
               <p className="text-xs text-slate-400 mt-0.5">Fast navigation & instant stock levels checker</p>
             </div>
-            
+
             {/* Quick Actions Interactive Grid */}
             <div className="grid grid-cols-2 gap-2">
               <QuickAction href="/billing" label="New Bill" icon={<ShoppingCart size={15} />} color="bg-navy-950 hover:bg-navy-800 hover:shadow-md hover:-translate-y-0.5" />
@@ -702,9 +702,8 @@ export default function DashboardPage() {
                             <p className="font-bold text-slate-800 truncate">{p.name}</p>
                             <p className="text-[9px] text-slate-400 font-mono mt-0.5">SKU: {p.sku}</p>
                           </div>
-                          <span className={`shrink-0 font-bold px-2 py-0.5 rounded-full ${
-                            out ? "bg-red-50 text-red-650 border border-red-100" : low ? "bg-orange-50 text-orange-655 border border-orange-100" : "bg-green-50 text-green-655 border border-green-100"
-                          }`}>
+                          <span className={`shrink-0 font-bold px-2 py-0.5 rounded-full ${out ? "bg-red-50 text-red-650 border border-red-100" : low ? "bg-orange-50 text-orange-655 border border-orange-100" : "bg-green-50 text-green-655 border border-green-100"
+                            }`}>
                             {p.stock} pcs
                           </span>
                         </div>
@@ -722,7 +721,7 @@ export default function DashboardPage() {
       {isOwner && (
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
           <h2 className="font-extrabold text-slate-900 text-sm md:text-base mb-4">Payment Channel Breakdown</h2>
-          
+
           {(() => {
             const maxTotal = Math.max(...paymentMethodTotals.map((m) => m.total), 1);
             const COLORS: Record<string, string> = {

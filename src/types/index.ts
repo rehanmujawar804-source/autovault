@@ -22,7 +22,16 @@ export interface Product {
   buyPrice: number;   // owner-only
   sellPrice: number;
   lowStockThreshold: number;
+  status?: "Active" | "Inactive" | "Discontinued";
   fitments?: VehicleFitment[];
+  // Optional extended fields
+  supplier?: string;
+  hsn?: string;
+  gst?: number;
+  location?: string;
+  description?: string;
+  createdAt?: string; // ISO timestamp
+  updatedAt?: string; // ISO timestamp
 }
 
 // ── Invoice ───────────────────────────────────

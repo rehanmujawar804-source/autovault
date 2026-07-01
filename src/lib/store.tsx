@@ -16,6 +16,14 @@
  *   - STORE_VERSION is used to force a clean reset when bumped.
  *   - On first load after a version change, localStorage is wiped and the app
  *     starts with an empty state ready for live demonstration.
+ *
+ * Migration System:
+ *   - MIGRATIONS is a registry of one-time data repair functions.
+ *   - Each migration has a unique id, a description, and a pure function that
+ *     transforms the AppState and returns { state, log }.
+ *   - Applied migration IDs are persisted in MIGRATION_KEY so each migration
+ *     runs exactly once, even across future app restarts.
+ *   - To add a new migration: append an entry to the MIGRATIONS array below.
  */
 
 import {
@@ -61,6 +69,8 @@ const INITIAL_STATE: AppState = {
 };
 
 const STORAGE_KEY = "autovault_store";
+/** Tracks which migration IDs have already been applied. */
+const MIGRATION_KEY = "autovault_migrations";
 
 // ─────────────────────────────────────────────
 //  ACTIONS
@@ -93,6 +103,166 @@ type Action =
 
 export function roundMoney(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
+/** Generate a collision-safe unique ID with a prefix */
+export function generateUniqueId(prefix: string): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
+  const rand = Math.random().toString(36).substring(2, 10);
+  return `${prefix}-${Date.now()}-${rand}`;
+}
+
+/** Normalizes a product ensuring all standard properties are set properly */
+export function normalizeProduct(product: Partial<Product> & { id: string; name: string; sku: string }): Product {
+  const fallbackTimestamp = new Date().toISOString();
+  return {
+    ...product,
+    id: product.id,
+    name: product.name,
+    sku: product.sku,
+    brand: product.brand || "",
+    category: product.category || "",
+    stock: product.stock ?? 0,
+    buyPrice: product.buyPrice ?? 0,
+    sellPrice: product.sellPrice ?? 0,
+    lowStockThreshold: product.lowStockThreshold ?? 5,
+    status: product.status || "Active",
+    fitments: product.fitments || [],
+    createdAt: product.createdAt || fallbackTimestamp,
+    updatedAt: product.updatedAt || fallbackTimestamp,
+  };
+}
+
+// ─────────────────────────────────────────────
+//  MIGRATION SYSTEM
+// ─────────────────────────────────────────────
+
+type MigrationFn = (state: AppState) => { state: AppState; log: string[] };
+
+interface StoreMigration {
+  /** Unique, immutable ID. Once shipped never rename or reuse this string. */
+  id: string;
+  description: string;
+  run: MigrationFn;
+}
+
+/**
+ * Registry of one-time data migrations.
+ *
+ * Rules:
+ *  - Never delete or rename an existing entry — the ID is the idempotency key.
+ *  - Always append new migrations at the END of the array.
+ *  - Each `run` function must be pure: receive state, return { state, log }.
+ */
+const MIGRATIONS: StoreMigration[] = [
+  {
+    id: "m001-repair-duplicate-product-ids",
+    description:
+      "Detects products that share an ID (caused by Date.now() batch collision) and " +
+      "assigns each duplicate a new collision-safe ID. Also backfills status, createdAt, " +
+      "and updatedAt on every product.",
+    run(inputState) {
+      const log: string[] = [];
+      const seenIds = new Set<string>();
+
+      const repairedProducts = inputState.products.map((p) => {
+        let repaired = { ...p };
+
+        // ── Repair duplicate ID ───────────────────────
+        if (seenIds.has(repaired.id)) {
+          const oldId = repaired.id;
+          repaired.id = generateUniqueId("p");
+          log.push(
+            `Repaired: id "${oldId}" → "${repaired.id}" | SKU: ${repaired.sku} | Name: ${repaired.name}`
+          );
+        } else {
+          seenIds.add(repaired.id);
+        }
+
+        return normalizeProduct(repaired);
+      });
+
+      if (log.length === 0) {
+        log.push("No duplicate product IDs found — state is clean.");
+      }
+
+      return {
+        state: { ...inputState, products: repairedProducts },
+        log,
+      };
+    },
+  },
+  // ── Add future migrations here ─────────────────────────────────────────────
+  // {
+  //   id: "m002-your-next-migration",
+  //   description: "Short description of what this repairs.",
+  //   run(state) { return { state, log: [] }; },
+  // },
+];
+
+/**
+ * Loads the set of already-applied migration IDs from localStorage.
+ * Returns a Set so lookups are O(1).
+ */
+function loadAppliedMigrations(): Set<string> {
+  try {
+    const raw = localStorage.getItem(MIGRATION_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return new Set<string>(parsed);
+  } catch { /* ignore */ }
+  return new Set();
+}
+
+/**
+ * Persists the updated set of applied migration IDs to localStorage.
+ */
+function saveAppliedMigrations(applied: Set<string>): void {
+  try {
+    localStorage.setItem(MIGRATION_KEY, JSON.stringify([...applied]));
+  } catch { /* ignore */ }
+}
+
+/**
+ * Runs all pending migrations against `rawState` in order.
+ * Applied migration IDs are read from and written back to MIGRATION_KEY.
+ * Returns the (possibly repaired) state.
+ */
+function runMigrations(rawState: AppState): AppState {
+  const applied = loadAppliedMigrations();
+  let currentState = rawState;
+  let anyRan = false;
+
+  for (const migration of MIGRATIONS) {
+    if (applied.has(migration.id)) continue; // already ran — skip
+
+    try {
+      const result = migration.run(currentState);
+      currentState = result.state;
+      applied.add(migration.id);
+      anyRan = true;
+
+      // Log to console for traceability
+      console.group(`[AutoVault Migration] ${migration.id}`);
+      console.info(`Description: ${migration.description}`);
+      result.log.forEach((line) => console.info(line));
+      console.groupEnd();
+    } catch (err) {
+      console.error(
+        `[AutoVault Migration] FAILED: ${migration.id}`,
+        err
+      );
+      // Do not mark as applied — allow retry on next load
+    }
+  }
+
+  if (anyRan) {
+    saveAppliedMigrations(applied);
+  }
+
+  return currentState;
 }
 
 /** Calculate remaining due for an invoice after applying all repayments */
@@ -191,7 +361,7 @@ function reducer(state: AppState, action: Action): AppState {
         });
       } else if (inv.customer && inv.customer !== "Walk-in Customer") {
         const newCustomer: Customer = {
-          id: inv.customerId ?? `c-${Date.now()}`,
+          id: inv.customerId ?? `c-${crypto.randomUUID()}`,
           name: inv.customer,
           phone: inv.customerPhone,
           debt: inv.dueAmount,
@@ -268,9 +438,12 @@ function reducer(state: AppState, action: Action): AppState {
       return INITIAL_STATE;
 
     case "HYDRATE_STORE":
-      // Ensure debtPayments field exists for stores saved before this version
       return {
         ...action.state,
+        products: (action.state.products || []).map((p) => ({
+          ...p,
+          status: p.status || "Active",
+        })),
         debtPayments: action.state.debtPayments ?? [],
       };
 
@@ -371,8 +544,25 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           localStorage.removeItem(STORAGE_KEY);
           // State stays at INITIAL_STATE (empty arrays)
         } else {
-          // Version matches — restore saved state
-          dispatch({ type: "HYDRATE_STORE", state: parsed });
+          // ── Run any pending one-time migrations ──────────────────────────
+          // runMigrations() is pure: receives the raw parsed state, applies
+          // only migrations that have not yet been marked as done, and returns
+          // the (possibly repaired) state. Applied IDs are persisted to
+          // MIGRATION_KEY so this logic is idempotent across page reloads.
+          const migratedState = runMigrations(parsed as AppState);
+
+          // If migrations produced a different state, write it back to
+          // localStorage immediately so the repaired data is durable.
+          if (migratedState !== parsed) {
+            try {
+              localStorage.setItem(
+                STORAGE_KEY,
+                JSON.stringify({ ...migratedState, __v: STORE_VERSION })
+              );
+            } catch { /* ignore write failures */ }
+          }
+
+          dispatch({ type: "HYDRATE_STORE", state: migratedState });
         }
       }
     } catch {
@@ -404,14 +594,44 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }
 
   function addProduct(product: Omit<Product, "id">) {
+    const duplicate = state.products.find(
+      (p) => p.sku.trim().toLowerCase() === product.sku.trim().toLowerCase()
+    );
+    if (duplicate) {
+      throw new Error(`Duplicate SKU: SKU "${product.sku}" already exists on product "${duplicate.name}".`);
+    }
+
+    const timestamp = new Date().toISOString();
     dispatch({
       type: "ADD_PRODUCT",
-      product: { ...product, id: `p-${Date.now()}` },
+      product: {
+        ...product,
+        id: generateUniqueId("p"),
+        status: product.status || "Active",
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      },
     });
   }
 
   function updateProduct(product: Product) {
-    dispatch({ type: "UPDATE_PRODUCT", product });
+    const duplicate = state.products.find(
+      (p) =>
+        p.sku.trim().toLowerCase() === product.sku.trim().toLowerCase() &&
+        p.id !== product.id
+    );
+    if (duplicate) {
+      throw new Error(`Duplicate SKU: SKU "${product.sku}" already exists on product "${duplicate.name}".`);
+    }
+
+    const timestamp = new Date().toISOString();
+    dispatch({
+      type: "UPDATE_PRODUCT",
+      product: {
+        ...product,
+        updatedAt: timestamp,
+      },
+    });
   }
 
   function adjustStock(productId: string, delta: number) {
@@ -421,7 +641,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   function addCustomer(customer: Omit<Customer, "id">) {
     dispatch({
       type: "ADD_CUSTOMER",
-      customer: { ...customer, id: `c-${Date.now()}` },
+      customer: { ...customer, id: `c-${crypto.randomUUID()}` },
     });
   }
 
@@ -432,7 +652,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   function recordDebtPayment(payment: Omit<DebtPayment, "id">) {
     dispatch({
       type: "RECORD_DEBT_PAYMENT",
-      payment: { ...payment, id: `dp-${Date.now()}` },
+      payment: { ...payment, id: `dp-${crypto.randomUUID()}` },
     });
   }
 
