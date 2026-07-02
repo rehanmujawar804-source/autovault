@@ -4,6 +4,8 @@ import { useState, useMemo, useEffect, useRef, Fragment } from "react";
 import { useStore } from "@/lib/store";
 import { useRole } from "@/hooks/useRole";
 import type { Product, VehicleFitment } from "@/types";
+import { ProductFormModal, AdjustStockModal } from "./components/ProductModals";
+import Link from "next/link";
 import {
   Search,
   Plus,
@@ -94,21 +96,10 @@ export default function InventoryPage() {
   // ── Search input ref (keyboard shortcut) ─────────────────────────────────
   const searchRef = useRef<HTMLInputElement>(null);
 
-  // ── Modal: Add / Edit Product ─────────────────────────────────────────────
+  // ── Modal State triggers ──────────────────────────────────────────────────
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [form, setForm] = useState<ProductForm>(EMPTY_FORM);
-  const [formError, setFormError] = useState("");
-  const [formWarning, setFormWarning] = useState("");
-
-  // ── Modal subform: Fitments ───────────────────────────────────────────────
-  const [newFitBrand, setNewFitBrand] = useState("");
-  const [newFitModel, setNewFitModel] = useState("");
-  const [newFitYear, setNewFitYear] = useState("");
-
-  // ── Modal: Adjust Stock ───────────────────────────────────────────────────
   const [stockModal, setStockModal] = useState<Product | null>(null);
-  const [stockDelta, setStockDelta] = useState("");
 
   // ── Expandable Product Row State ──────────────────────────────────────────
   const [expandedProductId, setExpandedProductId] = useState<string | null>(null);
@@ -465,158 +456,7 @@ export default function InventoryPage() {
     stockFilter !== "All" ||
     sortBy !== "name-asc";
 
-  // ── Open Add modal ────────────────────────────────────────────
-  function openAddModal() {
-    setEditingProduct(null);
-    setForm(EMPTY_FORM);
-    setFormError("");
-    setFormWarning("");
-    setNewFitBrand("");
-    setNewFitModel("");
-    setNewFitYear("");
-    setShowModal(true);
-  }
-
-  function openEditModal(product: Product) {
-    setEditingProduct(product);
-    setForm({
-      name: product.name,
-      sku: product.sku,
-      brand: product.brand,
-      category: product.category,
-      status: (product.status as ProductStatus) || "Active",
-      stock: product.stock,
-      buyPrice: product.buyPrice,
-      sellPrice: product.sellPrice,
-      lowStockThreshold: product.lowStockThreshold,
-      fitments: product.fitments || [],
-    });
-    setFormError("");
-    setFormWarning("");
-    setNewFitBrand("");
-    setNewFitModel("");
-    setNewFitYear("");
-    setShowModal(true);
-  }
-
-  // ── Save (add or update) ──────────────────────────────────────────────────
-  function handleSave() {
-    setFormError("");
-    setFormWarning("");
-
-    // ── Name ──────────────────────────────────────────────────────────────────
-    const trimmedName = form.name.trim();
-    if (!trimmedName) {
-      setFormError("Product name is required.");
-      return;
-    }
-    if (trimmedName.length < 3) {
-      setFormError("Product name must be at least 3 characters.");
-      return;
-    }
-    if (trimmedName.length > 100) {
-      setFormError("Product name must not exceed 100 characters.");
-      return;
-    }
-
-    // ── SKU ───────────────────────────────────────────────────────────────────
-    const trimmedSku = form.sku.trim();
-    if (!trimmedSku) {
-      setFormError("SKU is required.");
-      return;
-    }
-    if (!SKU_REGEX.test(trimmedSku)) {
-      setFormError(
-        "SKU must be 3–40 characters and contain only letters, numbers, hyphens (-), or underscores (_)."
-      );
-      return;
-    }
-
-    // ── Prices ────────────────────────────────────────────────────────────────
-    if (form.buyPrice < 0) {
-      setFormError("Buy price cannot be negative.");
-      return;
-    }
-    if (form.sellPrice < 0) {
-      setFormError("Sell price cannot be negative.");
-      return;
-    }
-
-    // ── Stock / Threshold ─────────────────────────────────────────────────────
-    if (!Number.isInteger(form.stock) || form.stock < 0) {
-      setFormError("Stock must be a whole number (0 or more).");
-      return;
-    }
-    if (!Number.isInteger(form.lowStockThreshold) || form.lowStockThreshold < 1) {
-      setFormError("Low stock threshold must be a whole number of at least 1.");
-      return;
-    }
-
-    // ── Duplicate SKU ─────────────────────────────────────────────────────────
-    const duplicateSKU = state.products.find(
-      (p) =>
-        p.sku.trim().toLowerCase() === trimmedSku.toLowerCase() &&
-        (!editingProduct || p.id !== editingProduct.id)
-    );
-    if (duplicateSKU) {
-      setFormError(
-        `SKU "${trimmedSku}" is already used by "${duplicateSKU.name}". SKU must be unique.`
-      );
-      return;
-    }
-
-    // ── Sell < Buy warning (non-blocking) ─────────────────────────────────────
-    if (form.sellPrice > 0 && form.sellPrice < form.buyPrice) {
-      setFormWarning(
-        `Warning: Sell Price (₹${form.sellPrice}) is less than Buy Price (₹${form.buyPrice}). This product will be sold at a loss.`
-      );
-      // Do NOT return — allow save to proceed.
-    }
-
-    // ── Persist ───────────────────────────────────────────────────────────────
-    try {
-      if (editingProduct) {
-        updateProduct({ ...editingProduct, ...form, name: trimmedName, sku: editingProduct.sku });
-        showToast(`"${trimmedName}" updated successfully.`, "success");
-      } else {
-        addProduct({ ...form, name: trimmedName, sku: trimmedSku });
-        showToast(`"${trimmedName}" added successfully.`, "success");
-      }
-      setShowModal(false);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to save product.";
-      setFormError(msg);
-    }
-  }
-
-  // ── Stock adjustment ──────────────────────────────────────────────────────
-  function handleStockAdjust(direction: "add" | "remove") {
-    if (!stockModal) return;
-    const delta = Number(stockDelta);
-    if (isNaN(delta) || delta <= 0 || !Number.isInteger(delta)) {
-      showToast("Please enter a valid positive whole number.", "error");
-      return;
-    }
-    if (direction === "remove" && delta > stockModal.stock) {
-      showToast(`Cannot adjust stock down by ${delta}. Only ${stockModal.stock} units available.`, "error");
-      return;
-    }
-    try {
-      adjustStock(stockModal.id, direction === "add" ? delta : -delta);
-      showToast(`Adjusted stock for "${stockModal.name}" successfully!`, "success");
-      setStockModal(null);
-      setStockDelta("");
-    } catch (err) {
-      showToast("Failed to adjust stock.", "error");
-    }
-  }
-
-  // ── Field helper ──────────────────────────────────────────────────────────
-  function setField<K extends keyof ProductForm>(key: K, val: ProductForm[K]) {
-    setForm((prev) => ({ ...prev, [key]: val }));
-    setFormError("");
-    setFormWarning("");
-  }
+  // Modals are managed externally by imported modal components
 
   // ── Import / Export CSV ───────────────────────────────────────────────────
   function handleExportCSV() {
@@ -1281,7 +1121,7 @@ export default function InventoryPage() {
                   Import
                 </button>
                 <button
-                  onClick={openAddModal}
+                  onClick={() => { setEditingProduct(null); setShowModal(true); }}
                   className="flex items-center gap-1.5 h-9 px-4 rounded-lg text-xs font-bold text-navy-950 bg-yellow-400 hover:bg-yellow-300 border border-yellow-300 transition-all cursor-pointer shadow-sm"
                 >
                   <Plus size={14} />
@@ -1346,7 +1186,7 @@ export default function InventoryPage() {
               </div>
               {isOwner && (
                 <button
-                  onClick={openAddModal}
+                  onClick={() => { setEditingProduct(null); setShowModal(true); }}
                   className="inline-flex items-center gap-2 bg-yellow-400 hover:bg-yellow-300 text-navy-950 text-sm font-black px-6 py-2.5 rounded-xl transition-all shadow-md active:scale-95 cursor-pointer"
                 >
                   <Plus size={15} />
@@ -1575,19 +1415,19 @@ export default function InventoryPage() {
                         {/* Actions – icon buttons */}
                         <td className="px-4 py-3.5">
                           <div className="flex items-center justify-center gap-1">
-                            {/* View/Expand */}
-                            <button
-                              onClick={() => setExpandedProductId(isExpanded ? null : product.id)}
-                              title="View details"
+                            {/* View – navigates to Product Details Workspace */}
+                            <Link
+                              href={`/inventory/${product.id}`}
+                              title="Open product details"
                               className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-navy-700 hover:bg-slate-100 transition-all cursor-pointer"
                             >
                               <Eye size={15} />
-                            </button>
+                            </Link>
 
                             {/* Adjust Stock – owner only */}
                             {isOwner && (
                               <button
-                                onClick={() => { setStockModal(product); setStockDelta(""); }}
+                                onClick={() => setStockModal(product)}
                                 title="Adjust stock"
                                 className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-all cursor-pointer"
                               >
@@ -1598,7 +1438,7 @@ export default function InventoryPage() {
                             {/* Edit – owner only */}
                             {isOwner && (
                               <button
-                                onClick={() => openEditModal(product)}
+                                onClick={() => { setEditingProduct(product); setShowModal(true); }}
                                 title="Edit product"
                                 className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-navy-700 hover:bg-navy-50 transition-all cursor-pointer"
                               >
@@ -1773,378 +1613,16 @@ export default function InventoryPage() {
         )}
       </div>
 
-      {/* ── ADD / EDIT PRODUCT MODAL ─────────────────────────────────────── */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            {/* Modal header */}
-            <div className="flex items-center justify-between p-5 border-b border-slate-200">
-              <h2 className="font-bold text-slate-800">
-                {editingProduct ? "Edit Product" : "Add New Product"}
-              </h2>
-              <button
-                onClick={() => setShowModal(false)}
-                className="text-slate-400 hover:text-slate-700"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Form */}
-            <div className="p-5 space-y-4">
-              {formError && (
-                <div className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg">
-                  <AlertCircle size={15} className="shrink-0 mt-0.5" />
-                  <span>{formError}</span>
-                </div>
-              )}
-              {formWarning && !formError && (
-                <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 text-amber-800 text-sm px-4 py-3 rounded-lg">
-                  <AlertTriangle size={15} className="shrink-0 mt-0.5" />
-                  <span>{formWarning}</span>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <FieldLabel>Product Name *</FieldLabel>
-                  <input
-                    type="text"
-                    value={form.name}
-                    onChange={(e) => setField("name", e.target.value)}
-                    placeholder="e.g. LED Headlight H7"
-                    className={INPUT}
-                  />
-                </div>
-
-                <div>
-                  <FieldLabel>SKU *{editingProduct && <span className="ml-1 text-slate-400 normal-case font-normal">(read-only)</span>}</FieldLabel>
-                  <input
-                    type="text"
-                    value={form.sku}
-                    onChange={(e) => !editingProduct && setField("sku", e.target.value.toUpperCase())}
-                    readOnly={!!editingProduct}
-                    maxLength={40}
-                    placeholder="e.g. LED-001 (3–40 chars, alphanumeric, - or _)"
-                    className={`${INPUT} ${editingProduct ? "bg-slate-100 text-slate-500 cursor-not-allowed select-all" : "font-mono"}`}
-                  />
-                </div>
-
-                <div>
-                  <FieldLabel>Brand</FieldLabel>
-                  <input
-                    type="text"
-                    value={form.brand}
-                    onChange={(e) => setField("brand", e.target.value)}
-                    placeholder="e.g. Philips"
-                    className={INPUT}
-                  />
-                </div>
-
-                <div>
-                  <FieldLabel>Category</FieldLabel>
-                  <input
-                    type="text"
-                    value={form.category}
-                    onChange={(e) => setField("category", e.target.value)}
-                    placeholder="e.g. Lights"
-                    className={INPUT}
-                  />
-                </div>
-
-                <div className="col-span-1">
-                  <FieldLabel>Status</FieldLabel>
-                  <select
-                    value={form.status}
-                    onChange={(e) => setField("status", e.target.value as ProductStatus)}
-                    className={INPUT}
-                  >
-                    {PRODUCT_STATUSES.map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <FieldLabel>Initial Stock</FieldLabel>
-                  <input
-                    type="number"
-                    min="0"
-                    value={form.stock}
-                    onChange={(e) => setField("stock", Number(e.target.value))}
-                    className={INPUT}
-                  />
-                </div>
-
-                <div>
-                  <FieldLabel>Buy Price (₹) — Owner Only</FieldLabel>
-                  <input
-                    type="number"
-                    min="0"
-                    value={form.buyPrice}
-                    onChange={(e) =>
-                      setField("buyPrice", Number(e.target.value))
-                    }
-                    className={INPUT}
-                  />
-                </div>
-
-                <div>
-                  <FieldLabel>Sell Price (₹) *</FieldLabel>
-                  <input
-                    type="number"
-                    min="0"
-                    value={form.sellPrice}
-                    onChange={(e) =>
-                      setField("sellPrice", Number(e.target.value))
-                    }
-                    className={INPUT}
-                  />
-                </div>
-
-                <div>
-                  <FieldLabel>Low Stock Alert (units)</FieldLabel>
-                  <input
-                    type="number"
-                    min="1"
-                    value={form.lowStockThreshold}
-                    onChange={(e) =>
-                      setField("lowStockThreshold", Number(e.target.value))
-                    }
-                    className={INPUT}
-                  />
-                </div>
-              </div>
-
-              {/* Margin preview */}
-              {form.buyPrice > 0 && form.sellPrice > 0 && (
-                <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2.5 text-sm">
-                  <span className="text-green-700 font-medium">
-                    Margin:{" "}
-                    {Math.round(
-                      ((form.sellPrice - form.buyPrice) / form.sellPrice) * 100
-                    )}
-                    % &nbsp;|&nbsp; Profit per unit: ₹
-                    {(form.sellPrice - form.buyPrice).toLocaleString()}
-                  </span>
-                </div>
-              )}
-
-              {/* Compatible Vehicles (Fitments) Section */}
-              <div className="border-t border-slate-150 pt-4 space-y-3">
-                <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  Vehicle Compatibility (Fitment)
-                </h3>
-
-                {/* List of current fitments */}
-                {form.fitments.length === 0 ? (
-                  <p className="text-xs text-slate-400 italic">
-                    No compatible vehicles added. This product fits all vehicle makes & models.
-                  </p>
-                ) : (
-                  <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-2 bg-slate-50 rounded-xl border border-slate-200/60">
-                    {form.fitments.map((fit, idx) => (
-                      <span
-                        key={idx}
-                        className="bg-amber-50 text-amber-800 border border-amber-200 text-xs px-2.5 py-1 rounded-lg flex items-center gap-1.5 font-semibold"
-                      >
-                        {fit.brand} {fit.model} ({fit.year})
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setForm((prev) => ({
-                              ...prev,
-                              fitments: prev.fitments.filter((_, i) => i !== idx),
-                            }));
-                          }}
-                          className="text-slate-400 hover:text-red-650 focus:outline-none transition-colors cursor-pointer"
-                        >
-                          <X size={12} />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {/* Inline form to add a vehicle */}
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-3">
-                  <p className="text-xs font-bold text-slate-600">
-                    Add Compatible Vehicle Model
-                  </p>
-                  <div className="grid grid-cols-3 gap-2">
-                    <div>
-                      <input
-                        type="text"
-                        placeholder="Brand (Honda)"
-                        value={newFitBrand}
-                        onChange={(e) => setNewFitBrand(e.target.value)}
-                        className="w-full border border-slate-200 bg-white rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-navy-600/25 focus:border-navy-600 transition-all"
-                      />
-                    </div>
-                    <div>
-                      <input
-                        type="text"
-                        placeholder="Model (City)"
-                        value={newFitModel}
-                        onChange={(e) => setNewFitModel(e.target.value)}
-                        className="w-full border border-slate-200 bg-white rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-navy-600/25 focus:border-navy-600 transition-all"
-                      />
-                    </div>
-                    <div>
-                      <input
-                        type="text"
-                        placeholder="Year (2021)"
-                        value={newFitYear}
-                        onChange={(e) => setNewFitYear(e.target.value)}
-                        className="w-full border border-slate-200 bg-white rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-navy-600/25 focus:border-navy-600 transition-all"
-                      />
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const brand = newFitBrand.trim();
-                      const model = newFitModel.trim();
-                      const year = newFitYear.trim();
-
-                      if (!brand || !model || !year) {
-                        alert("Please fill in Brand, Model, and Year to add fitment.");
-                        return;
-                      }
-
-                      // Check if already exists
-                      const exists = form.fitments.some(
-                        (f) =>
-                          f.brand.toLowerCase() === brand.toLowerCase() &&
-                          f.model.toLowerCase() === model.toLowerCase() &&
-                          f.year === year
-                      );
-
-                      if (exists) {
-                        alert("This vehicle fitment is already added.");
-                        return;
-                      }
-
-                      setForm((prev) => ({
-                        ...prev,
-                        fitments: [...prev.fitments, { brand, model, year }],
-                      }));
-
-                      // Reset inputs
-                      setNewFitBrand("");
-                      setNewFitModel("");
-                      setNewFitYear("");
-                    }}
-                    className="w-full bg-navy-950 hover:bg-navy-800 text-white text-xs py-2 rounded-lg font-semibold transition-colors cursor-pointer"
-                  >
-                    + Add Compatible Vehicle
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="flex gap-3 px-5 pb-5">
-              <button
-                onClick={() => setShowModal(false)}
-                className="flex-1 border border-slate-200 text-slate-700 py-2.5 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSave}
-                className="flex-1 bg-navy-950 hover:bg-navy-800 text-white py-2.5 rounded-xl text-sm font-medium transition-colors"
-              >
-                {editingProduct ? "Save Changes" : "Add Product"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── ADJUST STOCK MODAL ────────────────────────────────────────────── */}
-      {stockModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
-            {/* Header */}
-            <div className="flex items-center justify-between p-5 border-b border-slate-200">
-              <div>
-                <h2 className="font-bold text-slate-800">Adjust Stock</h2>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  {stockModal.name}
-                </p>
-              </div>
-              <button
-                onClick={() => setStockModal(null)}
-                className="text-slate-400 hover:text-slate-700"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="p-5 space-y-4">
-              {/* Current stock */}
-              <div className="bg-slate-50 rounded-xl p-4 text-center">
-                <p className="text-xs text-slate-500 mb-1">Current Stock</p>
-                <p className="text-3xl font-bold text-slate-800">
-                  {stockModal.stock}
-                </p>
-                <p className="text-xs text-slate-400 mt-0.5">units</p>
-              </div>
-
-              {/* Amount */}
-              <div>
-                <FieldLabel>Quantity to Add or Remove</FieldLabel>
-                <input
-                  type="number"
-                  min="1"
-                  placeholder="Enter units..."
-                  value={stockDelta}
-                  onChange={(e) => setStockDelta(e.target.value)}
-                  className={INPUT}
-                  autoFocus
-                />
-              </div>
-
-              {/* Preview */}
-              {Number(stockDelta) > 0 && (
-                <div className="grid grid-cols-2 gap-3 text-center text-sm">
-                  <div className="bg-green-50 border border-green-200 rounded-xl p-3">
-                    <p className="text-xs text-green-600 mb-1">After Adding</p>
-                    <p className="font-bold text-green-700">
-                      {stockModal.stock + Number(stockDelta)}
-                    </p>
-                  </div>
-                  <div className="bg-red-50 border border-red-200 rounded-xl p-3">
-                    <p className="text-xs text-red-600 mb-1">After Removing</p>
-                    <p className="font-bold text-red-700">
-                      {Math.max(0, stockModal.stock - Number(stockDelta))}
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Footer */}
-            <div className="flex gap-3 px-5 pb-5">
-              <button
-                onClick={() => handleStockAdjust("remove")}
-                disabled={!stockDelta || Number(stockDelta) <= 0}
-                className="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-slate-200 disabled:cursor-not-allowed text-white py-2.5 rounded-xl text-sm font-medium transition-colors"
-              >
-                − Remove
-              </button>
-              <button
-                onClick={() => handleStockAdjust("add")}
-                disabled={!stockDelta || Number(stockDelta) <= 0}
-                className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-slate-200 disabled:cursor-not-allowed text-white py-2.5 rounded-xl text-sm font-medium transition-colors"
-              >
-                + Add
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ProductFormModal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        editingProduct={editingProduct}
+      />
+      <AdjustStockModal
+        isOpen={!!stockModal}
+        onClose={() => setStockModal(null)}
+        product={stockModal}
+      />
     </div>
   );
 }
