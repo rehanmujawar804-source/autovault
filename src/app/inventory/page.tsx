@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, Fragment } from "react";
+import { useState, useMemo, useEffect, useRef, Fragment } from "react";
 import { useStore } from "@/lib/store";
 import { useRole } from "@/hooks/useRole";
 import type { Product, VehicleFitment } from "@/types";
@@ -33,8 +33,22 @@ import {
 //  CATEGORIES derived from store data
 // ─────────────────────────────────────────────────────────────────────────────
 
-const STOCK_FILTERS = ["All", "Low Stock", "Out of Stock"] as const;
+const STOCK_FILTERS = ["All", "Healthy", "Low Stock", "Out of Stock"] as const;
 type StockFilter = (typeof STOCK_FILTERS)[number];
+
+const SORT_OPTIONS = [
+  { value: "name-asc",    label: "Name (A\u2013Z)" },
+  { value: "name-desc",   label: "Name (Z\u2013A)" },
+  { value: "sku-asc",     label: "SKU (A\u2013Z)" },
+  { value: "sku-desc",    label: "SKU (Z\u2013A)" },
+  { value: "stock-desc",  label: "Stock (Highest)" },
+  { value: "stock-asc",   label: "Stock (Lowest)" },
+  { value: "buy-desc",    label: "Buy Price (Highest)" },
+  { value: "buy-asc",     label: "Buy Price (Lowest)" },
+  { value: "sell-desc",   label: "Sell Price (Highest)" },
+  { value: "sell-asc",    label: "Sell Price (Lowest)" },
+  { value: "margin-desc", label: "Margin (Highest)" },
+];
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  EMPTY PRODUCT FORM
@@ -73,6 +87,12 @@ export default function InventoryPage() {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [stockFilter, setStockFilter] = useState<StockFilter>("All");
+  const [brandFilter, setBrandFilter] = useState("All");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [sortBy, setSortBy] = useState("name-asc");
+
+  // ── Search input ref (keyboard shortcut) ─────────────────────────────────
+  const searchRef = useRef<HTMLInputElement>(null);
 
   // ── Modal: Add / Edit Product ─────────────────────────────────────────────
   const [showModal, setShowModal] = useState(false);
@@ -99,6 +119,27 @@ export default function InventoryPage() {
     setIsMounted(true);
   }, []);
 
+  // ── Keyboard shortcuts: Ctrl+F focuses search, Esc resets all filters ────
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+      if (e.key === "Escape") {
+        setSearch("");
+        setCategoryFilter("All");
+        setBrandFilter("All");
+        setStatusFilter("All");
+        setStockFilter("All");
+        setSortBy("name-asc");
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── Click-to-copy SKU state ───────────────────────────────────────────────
   const [copiedSkuId, setCopiedSkuId] = useState<string | null>(null);
 
@@ -118,6 +159,25 @@ export default function InventoryPage() {
       new Set(state.products.map((p) => p.category))
     ).sort();
     return ["All", ...cats];
+  }, [state.products]);
+
+  const brands = useMemo(() => {
+    const b = Array.from(
+      new Set(state.products.map((p) => p.brand).filter(Boolean))
+    ).sort();
+    return ["All", ...b];
+  }, [state.products]);
+
+  const chipCounts = useMemo(() => {
+    const ps = state.products;
+    return {
+      all:          ps.length,
+      healthy:      ps.filter((p) => p.stock > p.lowStockThreshold).length,
+      lowStock:     ps.filter((p) => p.stock > 0 && p.stock <= p.lowStockThreshold).length,
+      outOfStock:   ps.filter((p) => p.stock === 0).length,
+      inactive:     ps.filter((p) => (p.status || "Active") === "Inactive").length,
+      discontinued: ps.filter((p) => p.status === "Discontinued").length,
+    };
   }, [state.products]);
 
   const stats = useMemo(() => {
@@ -253,8 +313,18 @@ export default function InventoryPage() {
     if (categoryFilter !== "All") {
       list = list.filter((p) => p.category === categoryFilter);
     }
+    // Brand
+    if (brandFilter !== "All") {
+      list = list.filter((p) => p.brand === brandFilter);
+    }
+    // Status
+    if (statusFilter !== "All") {
+      list = list.filter((p) => (p.status || "Active") === statusFilter);
+    }
     // Stock filter
-    if (stockFilter === "Low Stock") {
+    if (stockFilter === "Healthy") {
+      list = list.filter((p) => p.stock > p.lowStockThreshold);
+    } else if (stockFilter === "Low Stock") {
       list = list.filter((p) => p.stock > 0 && p.stock <= p.lowStockThreshold);
     } else if (stockFilter === "Out of Stock") {
       list = list.filter((p) => p.stock === 0);
@@ -269,8 +339,29 @@ export default function InventoryPage() {
           p.brand.toLowerCase().includes(q)
       );
     }
+    // Stable sort
+    list = [...list].sort((a, b) => {
+      switch (sortBy) {
+        case "name-asc":    return a.name.localeCompare(b.name)       || a.id.localeCompare(b.id);
+        case "name-desc":   return b.name.localeCompare(a.name)       || a.id.localeCompare(b.id);
+        case "sku-asc":     return a.sku.localeCompare(b.sku)         || a.id.localeCompare(b.id);
+        case "sku-desc":    return b.sku.localeCompare(a.sku)         || a.id.localeCompare(b.id);
+        case "stock-desc":  return (b.stock - a.stock)                || a.id.localeCompare(b.id);
+        case "stock-asc":   return (a.stock - b.stock)                || a.id.localeCompare(b.id);
+        case "buy-desc":    return (b.buyPrice - a.buyPrice)          || a.id.localeCompare(b.id);
+        case "buy-asc":     return (a.buyPrice - b.buyPrice)          || a.id.localeCompare(b.id);
+        case "sell-desc":   return (b.sellPrice - a.sellPrice)        || a.id.localeCompare(b.id);
+        case "sell-asc":    return (a.sellPrice - b.sellPrice)        || a.id.localeCompare(b.id);
+        case "margin-desc": {
+          const ma = a.sellPrice > 0 ? ((a.sellPrice - a.buyPrice) / a.sellPrice) * 100 : -Infinity;
+          const mb = b.sellPrice > 0 ? ((b.sellPrice - b.buyPrice) / b.sellPrice) * 100 : -Infinity;
+          return (mb - ma) || a.id.localeCompare(b.id);
+        }
+        default:            return a.name.localeCompare(b.name)       || a.id.localeCompare(b.id);
+      }
+    });
     return list;
-  }, [state.products, categoryFilter, stockFilter, search]);
+  }, [state.products, categoryFilter, brandFilter, statusFilter, stockFilter, search, sortBy]);
 
   if (!isMounted) {
     return (
@@ -356,7 +447,25 @@ export default function InventoryPage() {
     );
   }
 
-  // ── Open Add modal ────────────────────────────────────────────────────────
+  // ── Reset all filters ──────────────────────────────────────────
+  function resetFilters() {
+    setSearch("");
+    setCategoryFilter("All");
+    setBrandFilter("All");
+    setStatusFilter("All");
+    setStockFilter("All");
+    setSortBy("name-asc");
+  }
+
+  const hasActiveFilters =
+    search !== "" ||
+    categoryFilter !== "All" ||
+    brandFilter !== "All" ||
+    statusFilter !== "All" ||
+    stockFilter !== "All" ||
+    sortBy !== "name-asc";
+
+  // ── Open Add modal ────────────────────────────────────────────
   function openAddModal() {
     setEditingProduct(null);
     setForm(EMPTY_FORM);
@@ -798,34 +907,7 @@ export default function InventoryPage() {
         onChange={handleImportCSV}
         className="hidden"
       />
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-black text-navy-950">Inventory</h1>
-        {isOwner && (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => document.getElementById("csv-import-input")?.click()}
-              className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer"
-            >
-              <Upload size={14} />
-              Import CSV
-            </button>
-            <button
-              onClick={handleExportCSV}
-              className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer"
-            >
-              <Download size={14} />
-              Export CSV
-            </button>
-            <button
-              onClick={openAddModal}
-              className="flex items-center gap-2 bg-yellow-400 hover:bg-yellow-300 text-navy-950 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors cursor-pointer shadow-sm"
-            >
-              <Plus size={15} />
-              Add Product
-            </button>
-          </div>
-        )}
-      </div>
+      <h1 className="text-2xl font-black text-navy-950 mb-4">Inventory</h1>
 
       {/* ── KPI Cards ──────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6 gap-4 mb-6">
@@ -1092,60 +1174,161 @@ export default function InventoryPage() {
         </div>
       </div>
 
-      {/* ── Search + Filters ───────────────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-slate-200 mb-1">
-        <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row gap-3 items-start sm:items-center flex-wrap">
+      {/* ── Professional Sticky Filter Toolbar ──────────────────────────────── */}
+      <div className="sticky top-4 z-20 bg-white/95 backdrop-blur-sm rounded-2xl border border-slate-200 shadow-md mb-3">
+        <div className="flex items-center gap-2 px-4 h-14 overflow-x-auto">
+
           {/* Search */}
-          <div className="relative">
-            <Search
-              size={15}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-            />
+          <div className="relative shrink-0">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             <input
+              id="inv-search"
+              ref={searchRef}
               type="text"
-              placeholder="Search name, SKU, brand..."
+              placeholder="Search…  Ctrl+F"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="border border-slate-200 rounded-lg pl-8 pr-3 py-2 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-amber-400"
+              className="border border-slate-200 rounded-lg pl-8 pr-3 h-9 text-sm w-56 focus:outline-none focus:ring-2 focus:ring-amber-400 bg-slate-50 focus:bg-white transition-all placeholder:text-slate-400 placeholder:text-xs"
             />
           </div>
 
-          {/* Category tabs */}
-          <div className="flex gap-2 flex-wrap text-xs font-medium">
+          {/* Category */}
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="h-9 border border-slate-200 rounded-lg px-2.5 text-xs font-medium text-slate-700 bg-slate-50 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer shrink-0 max-w-[130px] transition-colors"
+          >
             {categories.map((c) => (
-              <button
-                key={c}
-                onClick={() => setCategoryFilter(c)}
-                className={`px-3 py-1.5 rounded-lg transition-colors ${categoryFilter === c
-                  ? "bg-navy-950 text-white"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
-              >
-                {c}
-              </button>
+              <option key={c} value={c}>{c === "All" ? "All Categories" : c}</option>
             ))}
-          </div>
+          </select>
 
-          {/* Stock filter */}
-          <div className="ml-auto flex gap-2 text-xs font-medium">
-            {STOCK_FILTERS.map((f) => (
-              <button
-                key={f}
-                onClick={() => setStockFilter(f)}
-                className={`px-3 py-1.5 rounded-lg transition-colors ${stockFilter === f
-                  ? f === "Out of Stock"
-                    ? "bg-red-600 text-white"
-                    : f === "Low Stock"
-                      ? "bg-orange-500 text-white"
-                      : "bg-navy-950 text-white"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
-              >
-                {f}
-              </button>
+          {/* Brand */}
+          <select
+            value={brandFilter}
+            onChange={(e) => setBrandFilter(e.target.value)}
+            className="h-9 border border-slate-200 rounded-lg px-2.5 text-xs font-medium text-slate-700 bg-slate-50 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer shrink-0 max-w-[130px] transition-colors"
+          >
+            {brands.map((b) => (
+              <option key={b} value={b}>{b === "All" ? "All Brands" : b}</option>
             ))}
+          </select>
+
+          {/* Status */}
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="h-9 border border-slate-200 rounded-lg px-2.5 text-xs font-medium text-slate-700 bg-slate-50 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer shrink-0 transition-colors"
+          >
+            <option value="All">All Status</option>
+            <option value="Active">Active</option>
+            <option value="Inactive">Inactive</option>
+            <option value="Discontinued">Discontinued</option>
+          </select>
+
+          {/* Stock */}
+          <select
+            value={stockFilter}
+            onChange={(e) => setStockFilter(e.target.value as StockFilter)}
+            className="h-9 border border-slate-200 rounded-lg px-2.5 text-xs font-medium text-slate-700 bg-slate-50 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer shrink-0 transition-colors"
+          >
+            <option value="All">All Stock</option>
+            <option value="Healthy">Healthy</option>
+            <option value="Low Stock">Low Stock</option>
+            <option value="Out of Stock">Out of Stock</option>
+          </select>
+
+          {/* Sort */}
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="h-9 border border-slate-200 rounded-lg px-2.5 text-xs font-medium text-slate-700 bg-slate-50 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer shrink-0 max-w-[160px] transition-colors"
+          >
+            {SORT_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+
+          {/* Divider */}
+          <div className="h-6 w-px bg-slate-200 mx-1 shrink-0" />
+
+          {/* Action buttons */}
+          <div className="flex items-center gap-1.5 ml-auto shrink-0">
+            {hasActiveFilters && (
+              <button
+                onClick={resetFilters}
+                title="Reset all filters (Esc)"
+                className="flex items-center gap-1.5 h-9 px-3 rounded-lg text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-all cursor-pointer"
+              >
+                <X size={13} />
+                Reset
+              </button>
+            )}
+            {isOwner && (
+              <>
+                <button
+                  onClick={handleExportCSV}
+                  className="flex items-center gap-1.5 h-9 px-3 rounded-lg text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-all cursor-pointer"
+                >
+                  <Download size={13} />
+                  Export
+                </button>
+                <button
+                  onClick={() => document.getElementById("csv-import-input")?.click()}
+                  className="flex items-center gap-1.5 h-9 px-3 rounded-lg text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-all cursor-pointer"
+                >
+                  <Upload size={13} />
+                  Import
+                </button>
+                <button
+                  onClick={openAddModal}
+                  className="flex items-center gap-1.5 h-9 px-4 rounded-lg text-xs font-bold text-navy-950 bg-yellow-400 hover:bg-yellow-300 border border-yellow-300 transition-all cursor-pointer shadow-sm"
+                >
+                  <Plus size={14} />
+                  Add Product
+                </button>
+              </>
+            )}
           </div>
         </div>
+      </div>
+
+      {/* ── Quick Filter Chips ──────────────────────────────────────────────── */}
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+        {([
+          { key: "all",          label: "All",          count: chipCounts.all,          stock: "All" as StockFilter,            status: "All" },
+          { key: "healthy",      label: "Healthy",      count: chipCounts.healthy,      stock: "Healthy" as StockFilter,        status: "All" },
+          { key: "lowStock",     label: "Low Stock",    count: chipCounts.lowStock,     stock: "Low Stock" as StockFilter,      status: "All" },
+          { key: "outOfStock",   label: "Out of Stock", count: chipCounts.outOfStock,   stock: "Out of Stock" as StockFilter,   status: "All" },
+          { key: "inactive",     label: "Inactive",     count: chipCounts.inactive,     stock: "All" as StockFilter,            status: "Inactive" },
+          { key: "discontinued", label: "Discontinued", count: chipCounts.discontinued, stock: "All" as StockFilter,            status: "Discontinued" },
+        ]).map((chip) => {
+          const isActive = chip.status === "All"
+            ? stockFilter === chip.stock && statusFilter === "All"
+            : statusFilter === chip.status && stockFilter === "All";
+          return (
+            <button
+              key={chip.key}
+              onClick={() => { setStockFilter(chip.stock); setStatusFilter(chip.status); }}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all duration-150 cursor-pointer ${
+                isActive
+                  ? "bg-navy-950 text-white border-navy-950 shadow-sm"
+                  : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:border-slate-300"
+              }`}
+            >
+              {chip.label}
+              <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
+                isActive ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"
+              }`}>
+                {chip.count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ── Table Card ──────────────────────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-slate-200 mb-1 shadow-sm">
 
         {/* ── Table ──────────────────────────────────────────────────────── */}
         {filtered.length === 0 ? (
@@ -1184,11 +1367,7 @@ export default function InventoryPage() {
                 </p>
               </div>
               <button
-                onClick={() => {
-                  setSearch("");
-                  setCategoryFilter("All");
-                  setStockFilter("All");
-                }}
+                onClick={resetFilters}
                 className="inline-flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-semibold px-5 py-2 rounded-xl transition-all cursor-pointer"
               >
                 Reset Filters
@@ -1556,17 +1735,40 @@ export default function InventoryPage() {
         )}
       </div>
 
-      {/* ── Result count ── */}
-      <div className="flex items-center justify-between mt-2 px-1">
-        <p className="text-xs text-slate-400">
-          Showing <span className="font-semibold text-slate-600">{filtered.length}</span> of <span className="font-semibold text-slate-600">{state.products.length}</span> products
+      {/* ── Table Footer ───────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between mt-3 px-1 flex-wrap gap-2">
+        {/* Left: count */}
+        <p className="text-xs text-slate-500">
+          Showing{" "}
+          <span className="font-bold text-slate-700">{filtered.length}</span>
+          {" "}of{" "}
+          <span className="font-bold text-slate-700">{state.products.length}</span>
+          {" "}products
         </p>
-        {filtered.length < state.products.length && (
+
+        {/* Center: active filter + sort tags */}
+        {hasActiveFilters && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {(search !== "" || categoryFilter !== "All" || brandFilter !== "All" || statusFilter !== "All" || stockFilter !== "All") && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-slate-100 border border-slate-200 text-slate-600 px-2 py-0.5 rounded-md">
+                Filtered
+              </span>
+            )}
+            {sortBy !== "name-asc" && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-amber-50 border border-amber-200 text-amber-700 px-2 py-0.5 rounded-md">
+                {SORT_OPTIONS.find((o) => o.value === sortBy)?.label ?? sortBy}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Right: clear */}
+        {hasActiveFilters && (
           <button
-            onClick={() => { setSearch(""); setCategoryFilter("All"); setStockFilter("All"); }}
-            className="text-xs text-amber-600 hover:text-amber-700 font-semibold cursor-pointer"
+            onClick={resetFilters}
+            className="text-xs text-amber-600 hover:text-amber-700 font-semibold cursor-pointer transition-colors"
           >
-            Clear filters
+            Clear all filters
           </button>
         )}
       </div>
