@@ -22,6 +22,11 @@ import {
   Activity,
   Info,
   CheckCircle2,
+  Eye,
+  Copy,
+  Check,
+  Layers,
+  ArrowUpDown,
 } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -87,6 +92,25 @@ export default function InventoryPage() {
 
   // ── Expandable Product Row State ──────────────────────────────────────────
   const [expandedProductId, setExpandedProductId] = useState<string | null>(null);
+
+  // ── Hydration safe mount state ──────────────────────────────────────────
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // ── Click-to-copy SKU state ───────────────────────────────────────────────
+  const [copiedSkuId, setCopiedSkuId] = useState<string | null>(null);
+
+  function handleCopySku(product: Product) {
+    navigator.clipboard.writeText(product.sku).then(() => {
+      setCopiedSkuId(product.id);
+      showToast(`SKU "${product.sku}" copied to clipboard`, "success");
+      setTimeout(() => setCopiedSkuId(null), 2000);
+    }).catch(() => {
+      showToast("Failed to copy SKU", "error");
+    });
+  }
 
   // ── Derived ───────────────────────────────────────────────────────────────
   const categories = useMemo(() => {
@@ -247,6 +271,90 @@ export default function InventoryPage() {
     }
     return list;
   }, [state.products, categoryFilter, stockFilter, search]);
+
+  if (!isMounted) {
+    return (
+      <div>
+        {/* Header Skeleton */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="h-8 w-32 bg-slate-200 rounded-lg animate-pulse" />
+          <div className="flex gap-2">
+            <div className="h-10 w-28 bg-slate-200 rounded-xl animate-pulse" />
+            <div className="h-10 w-28 bg-slate-200 rounded-xl animate-pulse" />
+            <div className="h-10 w-32 bg-slate-200 rounded-xl animate-pulse" />
+          </div>
+        </div>
+
+        {/* KPI Cards Skeletons */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6 gap-4 mb-6">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-32 bg-slate-100 rounded-2xl border border-slate-200 p-5 flex flex-col justify-between animate-pulse">
+              <div className="w-9 h-9 rounded-xl bg-slate-200" />
+              <div>
+                <div className="h-3 w-16 bg-slate-200 rounded mb-2" />
+                <div className="h-6 w-24 bg-slate-200 rounded" />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Operations Control Room Skeleton */}
+        <div className="bg-white rounded-2xl border border-slate-200 mb-6 shadow-sm overflow-hidden animate-pulse">
+          <div className="px-5 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+            <div className="h-4 w-40 bg-slate-200 rounded" />
+            <div className="h-4 w-12 bg-slate-200 rounded-full" />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="px-5 py-4 flex flex-col gap-2">
+                <div className="h-3 w-16 bg-slate-200 rounded" />
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-slate-200 shrink-0" />
+                  <div className="w-full">
+                    <div className="h-4 w-20 bg-slate-200 rounded mb-1" />
+                    <div className="h-3 w-12 bg-slate-200 rounded" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Filter Bar Skeleton */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 mb-6 flex flex-col sm:flex-row gap-3 items-center justify-between animate-pulse">
+          <div className="h-9 w-64 bg-slate-200 rounded-lg" />
+          <div className="flex gap-2">
+            <div className="h-8 w-16 bg-slate-200 rounded-lg" />
+            <div className="h-8 w-20 bg-slate-200 rounded-lg" />
+            <div className="h-8 w-24 bg-slate-200 rounded-lg" />
+          </div>
+        </div>
+
+        {/* Table Skeletons */}
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm animate-pulse">
+          <div className="bg-slate-50 border-b border-slate-250 h-10 w-full" />
+          <div className="divide-y divide-slate-100">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="p-4 flex justify-between items-center gap-4">
+                <div className="flex items-center gap-3 w-1/3">
+                  <div className="w-4 h-4 bg-slate-200 rounded" />
+                  <div>
+                    <div className="h-4 w-32 bg-slate-200 rounded mb-1.5" />
+                    <div className="h-3 w-20 bg-slate-200 rounded" />
+                  </div>
+                </div>
+                <div className="h-4 w-20 bg-slate-200 rounded hidden md:block" />
+                <div className="h-4 w-20 bg-slate-200 rounded hidden lg:block" />
+                <div className="h-4 w-12 bg-slate-200 rounded" />
+                <div className="h-4 w-16 bg-slate-200 rounded" />
+                <div className="h-8 w-20 bg-slate-200 rounded" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // ── Open Add modal ────────────────────────────────────────────────────────
   function openAddModal() {
@@ -1042,32 +1150,46 @@ export default function InventoryPage() {
         {/* ── Table ──────────────────────────────────────────────────────── */}
         {filtered.length === 0 ? (
           state.products.length === 0 ? (
-            <div className="p-16 text-center bg-white border border-slate-200 rounded-2xl shadow-sm">
-              <Package size={40} className="text-slate-350 mx-auto mb-3" />
-              <p className="text-slate-450 text-base font-bold">Warehouse is empty</p>
-              <p className="text-slate-350 text-xs mt-1 max-w-sm mx-auto">There are no products in the catalog. Add products to start managing stock and billing sales.</p>
+            /* ── Empty warehouse state ── */
+            <div className="py-20 flex flex-col items-center gap-4">
+              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-50 border border-slate-200 flex items-center justify-center shadow-sm">
+                <Package size={36} className="text-slate-300" />
+              </div>
+              <div className="text-center">
+                <p className="text-base font-bold text-slate-700">Warehouse is Empty</p>
+                <p className="text-sm text-slate-400 mt-1 max-w-xs mx-auto leading-relaxed">
+                  No inventory has been added yet. Start by importing a CSV or adding your first product.
+                </p>
+              </div>
               {isOwner && (
                 <button
                   onClick={openAddModal}
-                  className="mt-4 inline-flex items-center gap-1.5 bg-yellow-400 hover:bg-yellow-300 text-navy-950 text-xs font-black px-5 py-2.5 rounded-xl transition-all shadow-md active:scale-95 cursor-pointer font-sans"
+                  className="inline-flex items-center gap-2 bg-yellow-400 hover:bg-yellow-300 text-navy-950 text-sm font-black px-6 py-2.5 rounded-xl transition-all shadow-md active:scale-95 cursor-pointer"
                 >
-                  <Plus size={14} />
+                  <Plus size={15} />
                   Add First Product
                 </button>
               )}
             </div>
           ) : (
-            <div className="p-16 text-center bg-white border border-slate-200 rounded-2xl shadow-sm">
-              <Search size={40} className="text-slate-350 mx-auto mb-3" />
-              <p className="text-slate-400 text-sm font-bold">No products match filters</p>
-              <p className="text-slate-350 text-xs mt-1 max-w-xs mx-auto">Try clearing search text or resetting the category and stock filters.</p>
+            /* ── No search results state ── */
+            <div className="py-20 flex flex-col items-center gap-4">
+              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-50 border border-slate-200 flex items-center justify-center shadow-sm">
+                <Search size={32} className="text-slate-300" />
+              </div>
+              <div className="text-center">
+                <p className="text-base font-bold text-slate-700">No Products Match Your Filters</p>
+                <p className="text-sm text-slate-400 mt-1 max-w-xs mx-auto leading-relaxed">
+                  Try adjusting your search query or clearing the active category and stock filters.
+                </p>
+              </div>
               <button
                 onClick={() => {
                   setSearch("");
                   setCategoryFilter("All");
                   setStockFilter("All");
                 }}
-                className="mt-4 text-xs font-bold text-amber-500 hover:text-amber-600 underline cursor-pointer"
+                className="inline-flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-semibold px-5 py-2 rounded-xl transition-all cursor-pointer"
               >
                 Reset Filters
               </button>
@@ -1075,334 +1197,350 @@ export default function InventoryPage() {
           )
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
-                  <th className="px-5 py-3 text-left font-medium">Product</th>
-                  <th className="px-5 py-3 text-left font-medium hidden md:table-cell">SKU</th>
-                  <th className="px-5 py-3 text-left font-medium hidden lg:table-cell">Brand</th>
-                  <th className="px-5 py-3 text-left font-medium hidden lg:table-cell">Category</th>
-                  <th className="px-5 py-3 text-center font-medium">Stock</th>
+            <table className="w-full text-sm border-collapse">
+              {/* ── Sticky professional header ── */}
+              <thead className="sticky top-0 z-10">
+                <tr className="bg-slate-50 border-b-2 border-slate-200">
+                  {/* Expand toggle column */}
+                  <th className="w-8 pl-4 pr-1 py-3" />
+                  {/* Product */}
+                  <th className="px-4 py-3 text-left">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Product</span>
+                  </th>
+                  {/* SKU */}
+                  <th className="px-4 py-3 text-left hidden md:table-cell">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">SKU</span>
+                  </th>
+                  {/* Brand */}
+                  <th className="px-4 py-3 text-left hidden lg:table-cell">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Brand</span>
+                  </th>
+                  {/* Category */}
+                  <th className="px-4 py-3 text-left hidden lg:table-cell">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Category</span>
+                  </th>
+                  {/* Status */}
+                  <th className="px-4 py-3 text-center hidden xl:table-cell">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Status</span>
+                  </th>
+                  {/* Stock */}
+                  <th className="px-4 py-3 text-center">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Stock</span>
+                  </th>
+                  {/* Buy price – owner only */}
                   {isOwner && (
-                    <th className="px-5 py-3 text-right font-medium">Buy ₹</th>
+                    <th className="px-4 py-3 text-right hidden lg:table-cell">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Buy ₹</span>
+                    </th>
                   )}
-                  <th className="px-5 py-3 text-right font-medium">Sell ₹</th>
+                  {/* Sell price */}
+                  <th className="px-4 py-3 text-right">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Sell ₹</span>
+                  </th>
+                  {/* Margin – owner only */}
                   {isOwner && (
-                    <th className="px-5 py-3 text-right font-medium hidden md:table-cell">Margin</th>
+                    <th className="px-4 py-3 text-right hidden md:table-cell">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Margin</span>
+                    </th>
                   )}
-                  <th className="px-5 py-3 text-center font-medium">Actions</th>
+                  {/* Actions */}
+                  <th className="px-4 py-3 text-center">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Actions</span>
+                  </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filtered.map((product) => {
+
+              <tbody>
+                {filtered.map((product, rowIndex) => {
                   const outOfStock = product.stock === 0;
-                  const lowStock =
-                    !outOfStock && product.stock <= product.lowStockThreshold;
-                  const margin = isOwner
-                    ? Math.round(
-                      ((product.sellPrice - product.buyPrice) /
-                        product.sellPrice) *
-                      100
-                    )
+                  const lowStock = !outOfStock && product.stock <= product.lowStockThreshold;
+                  const margin = isOwner && product.sellPrice > 0
+                    ? Math.round(((product.sellPrice - product.buyPrice) / product.sellPrice) * 100)
                     : 0;
-
                   const isExpanded = expandedProductId === product.id;
+                  const isCopied = copiedSkuId === product.id;
 
-                  // Row highlights based on stock status
-                  let borderLeftClass = "border-l-4 border-l-transparent";
-                  let rowBgClass = "hover:bg-slate-50/80";
-                  if (outOfStock) {
-                    rowBgClass = "bg-red-50/10 hover:bg-red-50/20";
-                    borderLeftClass = "border-l-4 border-l-red-500";
-                  } else if (lowStock) {
-                    rowBgClass = "bg-orange-50/10 hover:bg-orange-50/20";
-                    borderLeftClass = "border-l-4 border-l-orange-500";
-                  } else {
-                    borderLeftClass = "border-l-4 border-l-emerald-500";
-                  }
+                  // Stock progress bar: pct of threshold as a guide (capped at 100%)
+                  const stockPct = outOfStock ? 0
+                    : lowStock ? Math.round((product.stock / product.lowStockThreshold) * 50)
+                    : Math.min(100, Math.round((product.stock / (product.lowStockThreshold * 4)) * 100) + 50);
+                  const barColor = outOfStock ? 'bg-red-400' : lowStock ? 'bg-amber-400' : 'bg-emerald-500';
 
-                  if (isExpanded) {
-                    rowBgClass = "bg-slate-50/60";
-                  }
+                  // Left accent
+                  const accentColor = outOfStock ? 'border-l-red-500'
+                    : lowStock ? 'border-l-amber-500'
+                    : 'border-l-emerald-500';
+
+                  // Zebra + hover
+                  const zebraBase = rowIndex % 2 === 0 ? 'bg-white' : 'bg-slate-50/60';
+                  const rowBg = isExpanded ? 'bg-blue-50/30' : zebraBase;
+
+                  // Status badge
+                  const statusBadge = (product.status || 'Active') === 'Active'
+                    ? <span className="inline-flex items-center gap-1 text-[9px] font-extrabold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />Active</span>
+                    : product.status === 'Inactive'
+                    ? <span className="inline-flex items-center gap-1 text-[9px] font-extrabold uppercase tracking-wider bg-slate-100 text-slate-500 border border-slate-300 px-2 py-0.5 rounded-full"><span className="w-1.5 h-1.5 rounded-full bg-slate-400 inline-block" />Inactive</span>
+                    : <span className="inline-flex items-center gap-1 text-[9px] font-extrabold uppercase tracking-wider bg-red-50 text-red-600 border border-red-200 px-2 py-0.5 rounded-full"><span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />Discontinued</span>;
 
                   return (
                     <Fragment key={product.id}>
+                      {/* ── Main row ── */}
                       <tr
-                        className={`transition-colors border-b border-slate-100 ${borderLeftClass} ${rowBgClass}`}
+                        className={`border-b border-slate-100 border-l-4 ${accentColor} ${rowBg} hover:bg-slate-50 hover:shadow-sm transition-all duration-150 group`}
                       >
-                        {/* Product name */}
-                        <td className="px-5 py-3.5">
-                          <div className="flex items-center gap-3">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setExpandedProductId(
-                                  expandedProductId === product.id ? null : product.id
-                                );
-                              }}
-                              className="p-1 hover:bg-slate-200/80 rounded-lg text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
-                              title="Toggle Details"
-                            >
-                              {expandedProductId === product.id ? (
-                                <ChevronUp size={15} />
-                              ) : (
-                                <ChevronRight size={15} />
-                              )}
-                            </button>
-                            <div>
-                              <div
-                                className="font-semibold text-slate-800 hover:text-navy-600 transition-colors cursor-pointer"
-                                onClick={() => setExpandedProductId(
-                                  expandedProductId === product.id ? null : product.id
-                                )}
-                              >
-                                {product.name}
-                              </div>
-                              <div className="flex gap-1.5 mt-1">
-                                {outOfStock && (
-                                  <span className="text-[9px] uppercase tracking-wider font-extrabold bg-red-50 text-red-650 border border-red-200 px-2 py-0.5 rounded">
-                                    Out of Stock
-                                  </span>
-                                )}
-                                {lowStock && (
-                                  <span className="text-[9px] uppercase tracking-wider font-extrabold bg-orange-50 text-orange-650 border border-orange-200 px-2 py-0.5 rounded">
-                                    Low Stock ({product.stock})
-                                  </span>
-                                )}
-                                {!outOfStock && !lowStock && (
-                                  <span className="text-[9px] uppercase tracking-wider font-extrabold bg-emerald-50/80 text-emerald-750 border border-emerald-200 px-2 py-0.5 rounded">
-                                    Healthy
-                                  </span>
-                                )}
-                                {/* Product Status badge */}
-                                {(product.status || "Active") === "Active" ? (
-                                  <span className="text-[9px] uppercase tracking-wider font-extrabold bg-blue-50 text-blue-650 border border-blue-200 px-2 py-0.5 rounded">
-                                    Active
-                                  </span>
-                                ) : (product.status === "Inactive") ? (
-                                  <span className="text-[9px] uppercase tracking-wider font-extrabold bg-slate-100 text-slate-600 border border-slate-250 px-2 py-0.5 rounded">
-                                    Inactive
-                                  </span>
-                                ) : (
-                                  <span className="text-[9px] uppercase tracking-wider font-extrabold bg-amber-50 text-amber-700 border border-amber-250 px-2 py-0.5 rounded">
-                                    Discontinued
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
+                        {/* Expand toggle */}
+                        <td className="pl-3 pr-1 py-3.5 w-8">
+                          <button
+                            onClick={() => setExpandedProductId(isExpanded ? null : product.id)}
+                            className="p-1 rounded-md hover:bg-slate-200/80 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                            title={isExpanded ? 'Collapse' : 'Expand details'}
+                          >
+                            {isExpanded ? <ChevronUp size={14} /> : <ChevronRight size={14} />}
+                          </button>
                         </td>
 
-                        {/* SKU */}
-                        <td className="px-5 py-3.5 hidden md:table-cell">
-                          <span className="font-mono text-xs text-slate-650 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded select-all">
-                            {product.sku}
-                          </span>
+                        {/* Product */}
+                        <td className="px-4 py-3.5 min-w-[180px]">
+                          <button
+                            className="text-left w-full"
+                            onClick={() => setExpandedProductId(isExpanded ? null : product.id)}
+                          >
+                            <p className="font-semibold text-slate-800 group-hover:text-navy-700 transition-colors text-[13px] leading-tight">
+                              {product.name}
+                            </p>
+                            <p className="font-mono text-[10px] text-slate-400 mt-0.5 tracking-wide">{product.sku}</p>
+                          </button>
+                        </td>
+
+                        {/* SKU – click to copy */}
+                        <td className="px-4 py-3.5 hidden md:table-cell">
+                          <button
+                            onClick={() => handleCopySku(product)}
+                            title={isCopied ? 'Copied!' : 'Click to copy SKU'}
+                            className={`group/sku inline-flex items-center gap-1.5 font-mono text-xs border rounded-md px-2 py-1 transition-all duration-200 cursor-pointer select-none ${
+                              isCopied
+                                ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+                                : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-navy-50 hover:border-navy-300 hover:text-navy-700'
+                            }`}
+                          >
+                            {isCopied ? <Check size={11} className="text-emerald-600" /> : <Copy size={11} className="text-slate-400 group-hover/sku:text-navy-500" />}
+                            {isCopied ? 'Copied!' : product.sku}
+                          </button>
                         </td>
 
                         {/* Brand */}
-                        <td className="px-5 py-3.5 text-slate-700 font-semibold hidden lg:table-cell">
-                          {product.brand || "—"}
+                        <td className="px-4 py-3.5 hidden lg:table-cell">
+                          <span className="text-[13px] font-semibold text-slate-700">{product.brand || <span className="text-slate-300">—</span>}</span>
                         </td>
 
                         {/* Category */}
-                        <td className="px-5 py-3.5 hidden lg:table-cell">
-                          <span className="text-xs bg-slate-100 border border-slate-200 text-slate-650 px-2.5 py-1 rounded-md font-medium">
-                            {product.category}
+                        <td className="px-4 py-3.5 hidden lg:table-cell">
+                          <span className="inline-block text-[10px] font-semibold bg-slate-100 border border-slate-200 text-slate-600 px-2.5 py-1 rounded-md">
+                            {product.category || '—'}
                           </span>
                         </td>
 
-                        {/* Stock */}
-                        <td className="px-5 py-3.5 text-center">
-                          <span
-                            className={`inline-block font-bold px-2 py-0.5 rounded text-xs ${outOfStock
-                              ? "bg-red-50 text-red-650 border border-red-200"
-                              : lowStock
-                                ? "bg-orange-50 text-orange-650 border border-orange-200"
-                                : "bg-slate-55 text-slate-800"
-                              }`}
-                          >
-                            {product.stock}
-                          </span>
+                        {/* Status */}
+                        <td className="px-4 py-3.5 text-center hidden xl:table-cell">
+                          {statusBadge}
                         </td>
 
-                        {/* Buy price (owner only) */}
+                        {/* Stock – with mini progress bar */}
+                        <td className="px-4 py-3.5">
+                          <div className="flex flex-col items-center gap-1 min-w-[60px]">
+                            <span className={`text-xs font-black ${
+                              outOfStock ? 'text-red-600' : lowStock ? 'text-amber-600' : 'text-slate-800'
+                            }`}>
+                              {product.stock} <span className="font-normal text-slate-400 text-[9px]">units</span>
+                            </span>
+                            {/* Progress bar */}
+                            <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+                                style={{ width: `${Math.max(stockPct, outOfStock ? 0 : 4)}%` }}
+                              />
+                            </div>
+                            <span className={`text-[9px] font-bold uppercase tracking-wide ${
+                              outOfStock ? 'text-red-500' : lowStock ? 'text-amber-500' : 'text-emerald-600'
+                            }`}>
+                              {outOfStock ? 'Out of Stock' : lowStock ? 'Low' : 'Healthy'}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* Buy price – owner only */}
                         {isOwner && (
-                          <td className="px-5 py-3.5 text-right font-medium text-slate-500">
-                            ₹{product.buyPrice.toLocaleString()}
+                          <td className="px-4 py-3.5 text-right hidden lg:table-cell">
+                            <span className="text-[13px] font-medium text-slate-500">₹{product.buyPrice.toLocaleString()}</span>
                           </td>
                         )}
 
                         {/* Sell price */}
-                        <td className="px-5 py-3.5 text-right font-bold text-slate-800">
-                          ₹{product.sellPrice.toLocaleString()}
+                        <td className="px-4 py-3.5 text-right">
+                          <span className="text-[13px] font-bold text-slate-800">₹{product.sellPrice.toLocaleString()}</span>
                         </td>
 
-                        {/* Margin (owner only) */}
+                        {/* Margin – owner only */}
                         {isOwner && (
-                          <td className="px-5 py-3.5 text-right hidden md:table-cell">
-                            <span
-                              className={`inline-block text-xs font-bold px-2 py-0.5 rounded border ${margin >= 30
-                                ? "bg-green-50 text-green-700 border-green-200"
-                                : margin >= 15
-                                  ? "bg-amber-50 text-amber-700 border-amber-200"
-                                  : "bg-red-50 text-red-700 border-red-200"
-                                }`}
-                            >
+                          <td className="px-4 py-3.5 text-right hidden md:table-cell">
+                            <span className={`inline-block text-[11px] font-black px-2 py-0.5 rounded-md border ${
+                              margin >= 30 ? 'bg-green-50 text-green-700 border-green-200'
+                              : margin >= 15 ? 'bg-amber-50 text-amber-700 border-amber-200'
+                              : 'bg-red-50 text-red-700 border-red-200'
+                            }`}>
                               {margin}%
                             </span>
                           </td>
                         )}
 
-                        {/* Actions */}
-                        <td className="px-5 py-3.5">
-                          <div className="flex items-center justify-center gap-1.5">
-                            {/* Stock adjust (owner only) */}
+                        {/* Actions – icon buttons */}
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center justify-center gap-1">
+                            {/* View/Expand */}
+                            <button
+                              onClick={() => setExpandedProductId(isExpanded ? null : product.id)}
+                              title="View details"
+                              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-navy-700 hover:bg-slate-100 transition-all cursor-pointer"
+                            >
+                              <Eye size={15} />
+                            </button>
+
+                            {/* Adjust Stock – owner only */}
                             {isOwner && (
                               <button
-                                onClick={() => {
-                                  setStockModal(product);
-                                  setStockDelta("");
-                                }}
-                                className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg transition-colors font-semibold cursor-pointer"
+                                onClick={() => { setStockModal(product); setStockDelta(""); }}
+                                title="Adjust stock"
+                                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-all cursor-pointer"
                               >
-                                Stock
+                                <Layers size={15} />
                               </button>
                             )}
 
-                            {/* Edit (owner only) */}
+                            {/* Edit – owner only */}
                             {isOwner && (
                               <button
                                 onClick={() => openEditModal(product)}
-                                className="text-xs bg-navy-950 hover:bg-navy-800 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 font-semibold cursor-pointer"
+                                title="Edit product"
+                                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-navy-700 hover:bg-navy-50 transition-all cursor-pointer"
                               >
-                                <Pencil size={11} />
-                                Edit
+                                <Pencil size={14} />
                               </button>
                             )}
-                            {/* Staff: view-only indicator */}
+
+                            {/* Movement history – disabled placeholder */}
+                            <button
+                              disabled
+                              title="Movement history (coming soon)"
+                              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-200 cursor-not-allowed"
+                            >
+                              <ArrowUpDown size={14} />
+                            </button>
+
+                            {/* Staff view-only */}
                             {!isOwner && (
-                              <span className="text-[10px] text-slate-400 font-medium italic px-2">
-                                View only
-                              </span>
+                              <span className="text-[10px] text-slate-400 italic px-1">View only</span>
                             )}
                           </div>
                         </td>
                       </tr>
 
-                      {/* Expandable Details Pane */}
+                      {/* ── Expanded details pane ── */}
                       {isExpanded && (
-                        <tr className={`${borderLeftClass} bg-slate-50/30`}>
-                          <td colSpan={isOwner ? 9 : 7} className="px-6 py-5 border-t border-b border-slate-200/50">
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <tr className={`border-l-4 ${accentColor} bg-slate-50/40`}>
+                          <td colSpan={isOwner ? 11 : 9} className="px-6 py-5 border-t border-b border-slate-200/60">
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
-                              {/* Column 1: Vehicle Compatibility */}
-                              <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm flex flex-col justify-between">
-                                <div>
-                                  <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-100">
-                                    <Info size={14} className="text-slate-500" />
-                                    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Vehicle Compatibility</h4>
+                              {/* Col 1: Vehicle Compatibility */}
+                              <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+                                <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-100">
+                                  <div className="w-6 h-6 rounded-md bg-amber-50 text-amber-600 flex items-center justify-center">
+                                    <Info size={13} />
                                   </div>
-                                  <div className="max-h-36 overflow-y-auto">
-                                    {!product.fitments || product.fitments.length === 0 ? (
-                                      <p className="text-xs text-slate-400 italic">
-                                        Universal Fitment (Fits all vehicle makes & models)
-                                      </p>
-                                    ) : (
-                                      <div className="flex flex-wrap gap-1.5 p-0.5">
-                                        {product.fitments.map((fit, idx) => (
-                                          <span
-                                            key={idx}
-                                            className="bg-amber-50/60 text-amber-800 border border-amber-200/80 text-[10px] font-semibold px-2 py-0.5 rounded"
-                                          >
-                                            {fit.brand} {fit.model} ({fit.year})
-                                          </span>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </div>
+                                  <h4 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Vehicle Compatibility</h4>
                                 </div>
-                                <div className="text-[10px] text-slate-400 mt-4 pt-2 border-t border-slate-50 italic">
-                                  * Fitments match against sales invoicing checklist.
-                                </div>
-                              </div>
-
-                              {/* Column 2: Recent Stock Movement Activity */}
-                              <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm flex flex-col justify-between">
-                                <div>
-                                  <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-100">
-                                    <Activity size={14} className="text-slate-500" />
-                                    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Recent Activity Ledger</h4>
-                                  </div>
-                                  <div className="space-y-2.5 max-h-36 overflow-y-auto pr-1">
-                                    <div className="flex items-start gap-2.5 text-xs">
-                                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5"></div>
-                                      <div className="flex-1">
-                                        <p className="text-slate-700 text-[11px] font-semibold leading-tight">Stock adjustment manually performed</p>
-                                        <span className="text-[10px] text-slate-400">June 20, 2026</span>
-                                      </div>
-                                      <span className="text-[11px] font-extrabold text-emerald-600 font-mono">+10 units</span>
+                                <div className="max-h-36 overflow-y-auto">
+                                  {!product.fitments || product.fitments.length === 0 ? (
+                                    <div className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2 border border-slate-100">
+                                      <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
+                                      <p className="text-xs text-slate-500 italic">Universal Fitment — fits all makes &amp; models</p>
                                     </div>
-                                    <div className="flex items-start gap-2.5 text-xs">
-                                      <div className="w-1.5 h-1.5 rounded-full bg-navy-500 mt-1.5"></div>
-                                      <div className="flex-1">
-                                        <p className="text-slate-700 text-[11px] font-semibold leading-tight">Invoice INV-2026-004 checkout</p>
-                                        <span className="text-[10px] text-slate-400">June 18, 2026</span>
-                                      </div>
-                                      <span className="text-[11px] font-extrabold text-navy-600 font-mono">-2 units</span>
-                                    </div>
-                                    <div className="flex items-start gap-2.5 text-xs">
-                                      <div className="w-1.5 h-1.5 rounded-full bg-navy-500 mt-1.5"></div>
-                                      <div className="flex-1">
-                                        <p className="text-slate-700 text-[11px] font-semibold leading-tight">Invoice INV-2026-001 checkout</p>
-                                        <span className="text-[10px] text-slate-400">June 12, 2026</span>
-                                      </div>
-                                      <span className="text-[11px] font-extrabold text-navy-600 font-mono">-1 unit</span>
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="text-[10px] text-slate-400 mt-4 pt-2 border-t border-slate-50 italic">
-                                  AutoVault records checkout logs and manual audits automatically.
-                                </div>
-                              </div>
-
-                              {/* Column 3: Reorder Intelligence & Margins */}
-                              <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm flex flex-col justify-between">
-                                <div>
-                                  <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-100">
-                                    <TrendingUp size={14} className="text-slate-500" />
-                                    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Inventory Intelligence</h4>
-                                  </div>
-                                  <div className="space-y-2 text-xs">
-                                    <div className="flex justify-between py-1 border-b border-slate-50">
-                                      <span className="text-slate-550">Stock Status:</span>
-                                      <span className={`font-bold ${outOfStock ? 'text-red-650 bg-red-50 px-1.5 py-0.5 rounded' : lowStock ? 'text-orange-650 bg-orange-50 px-1.5 py-0.5 rounded' : 'text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded'}`}>
-                                        {outOfStock ? 'Out of Stock' : lowStock ? 'Low Stock Warning' : 'Healthy Stock'}
-                                      </span>
-                                    </div>
-                                    <div className="flex justify-between py-1 border-b border-slate-50">
-                                      <span className="text-slate-550">Suggested Order:</span>
-                                      <span className="font-bold text-slate-800 bg-slate-50 px-1.5 py-0.5 rounded">
-                                        {outOfStock ? `${product.lowStockThreshold * 3} units` : lowStock ? `${product.lowStockThreshold * 2} units` : '0 units (Adequate)'}
-                                      </span>
-                                    </div>
-                                    <div className="flex justify-between py-1 border-b border-slate-50">
-                                      <span className="text-slate-550">Replenishment Lead:</span>
-                                      <span className="font-semibold text-slate-650">3 - 5 Days Est.</span>
-                                    </div>
-                                    {isOwner && (
-                                      <div className="flex justify-between py-1">
-                                        <span className="text-slate-555">Unit Profit:</span>
-                                        <span className="font-bold text-green-700 bg-green-50 border border-green-200 px-1.5 py-0.5 rounded">
-                                          ₹{(product.sellPrice - product.buyPrice).toLocaleString()}
+                                  ) : (
+                                    <div className="flex flex-wrap gap-1.5 pt-0.5">
+                                      {product.fitments.map((fit, idx) => (
+                                        <span key={idx} className="bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-semibold px-2.5 py-0.5 rounded-lg">
+                                          {fit.brand} {fit.model} ({fit.year})
                                         </span>
-                                      </div>
-                                    )}
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                                <p className="text-[10px] text-slate-400 mt-3 pt-2 border-t border-slate-50 italic">* Fitments match against sales invoicing checklist.</p>
+                              </div>
+
+                              {/* Col 2: Recent Activity */}
+                              <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+                                <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-100">
+                                  <div className="w-6 h-6 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center">
+                                    <Activity size={13} />
                                   </div>
+                                  <h4 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Recent Activity Ledger</h4>
                                 </div>
-                                <div className="text-[10px] text-slate-400 mt-4 pt-2 border-t border-slate-50 italic">
-                                  Based on low-stock thresholds & current transaction trends.
+                                <div className="space-y-2.5 max-h-36 overflow-y-auto">
+                                  {[
+                                    { dot: 'bg-emerald-500', label: 'Stock adjustment manually performed', date: 'June 20, 2026', delta: '+10 units', color: 'text-emerald-600' },
+                                    { dot: 'bg-blue-500', label: 'Invoice INV-2026-004 checkout', date: 'June 18, 2026', delta: '-2 units', color: 'text-slate-600' },
+                                    { dot: 'bg-blue-500', label: 'Invoice INV-2026-001 checkout', date: 'June 12, 2026', delta: '-1 unit', color: 'text-slate-600' },
+                                  ].map((entry, i) => (
+                                    <div key={i} className="flex items-start gap-2.5">
+                                      <div className={`w-1.5 h-1.5 rounded-full ${entry.dot} mt-1.5 shrink-0`} />
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-[11px] font-semibold text-slate-700 leading-tight">{entry.label}</p>
+                                        <span className="text-[10px] text-slate-400">{entry.date}</span>
+                                      </div>
+                                      <span className={`text-[11px] font-extrabold font-mono shrink-0 ${entry.color}`}>{entry.delta}</span>
+                                    </div>
+                                  ))}
                                 </div>
+                                <p className="text-[10px] text-slate-400 mt-3 pt-2 border-t border-slate-50 italic">AutoVault records checkout logs and manual audits automatically.</p>
+                              </div>
+
+                              {/* Col 3: Inventory Intelligence */}
+                              <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+                                <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-100">
+                                  <div className="w-6 h-6 rounded-md bg-violet-50 text-violet-600 flex items-center justify-center">
+                                    <TrendingUp size={13} />
+                                  </div>
+                                  <h4 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Inventory Intelligence</h4>
+                                </div>
+                                <div className="space-y-1.5 text-xs">
+                                  {[
+                                    {
+                                      label: 'Stock Status',
+                                      value: outOfStock ? 'Out of Stock' : lowStock ? 'Low Stock Warning' : 'Healthy Stock',
+                                      cls: outOfStock ? 'text-red-600 bg-red-50 border-red-200' : lowStock ? 'text-amber-700 bg-amber-50 border-amber-200' : 'text-emerald-700 bg-emerald-50 border-emerald-200',
+                                    },
+                                    {
+                                      label: 'Suggested Order',
+                                      value: outOfStock ? `${product.lowStockThreshold * 3} units` : lowStock ? `${product.lowStockThreshold * 2} units` : '0 units (Adequate)',
+                                      cls: 'text-slate-700 bg-slate-50 border-slate-200',
+                                    },
+                                    { label: 'Replenishment Lead', value: '3 – 5 Days Est.', cls: 'text-slate-600 bg-slate-50 border-slate-200' },
+                                  ].map((row) => (
+                                    <div key={row.label} className="flex items-center justify-between py-1 border-b border-slate-50 last:border-0">
+                                      <span className="text-slate-500 text-[11px]">{row.label}</span>
+                                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${row.cls}`}>{row.value}</span>
+                                    </div>
+                                  ))}
+                                  {isOwner && (
+                                    <div className="flex items-center justify-between py-1">
+                                      <span className="text-slate-500 text-[11px]">Unit Profit</span>
+                                      <span className="text-[10px] font-bold px-2 py-0.5 rounded border text-green-700 bg-green-50 border-green-200">
+                                        ₹{(product.sellPrice - product.buyPrice).toLocaleString()}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                                <p className="text-[10px] text-slate-400 mt-3 pt-2 border-t border-slate-50 italic">Based on low-stock thresholds &amp; current transaction trends.</p>
                               </div>
 
                             </div>
@@ -1418,9 +1556,20 @@ export default function InventoryPage() {
         )}
       </div>
 
-      <p className="text-xs text-slate-400 mt-2 px-1">
-        Showing {filtered.length} of {state.products.length} products
-      </p>
+      {/* ── Result count ── */}
+      <div className="flex items-center justify-between mt-2 px-1">
+        <p className="text-xs text-slate-400">
+          Showing <span className="font-semibold text-slate-600">{filtered.length}</span> of <span className="font-semibold text-slate-600">{state.products.length}</span> products
+        </p>
+        {filtered.length < state.products.length && (
+          <button
+            onClick={() => { setSearch(""); setCategoryFilter("All"); setStockFilter("All"); }}
+            className="text-xs text-amber-600 hover:text-amber-700 font-semibold cursor-pointer"
+          >
+            Clear filters
+          </button>
+        )}
+      </div>
 
       {/* ── ADD / EDIT PRODUCT MODAL ─────────────────────────────────────── */}
       {showModal && (
